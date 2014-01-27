@@ -30,7 +30,8 @@ my_f (const gsl_vector *v, void *params)
 }
 #else
 /*
- * Multiple minima whereever x and y are integers. Global minimum at (x,y)=(0,0)
+ * Multiple minima whereever x and y are integers. Global minimum
+ * at (x,y)=(0,0)
  */
 double
 my_f (const gsl_vector *v, void *params)
@@ -38,7 +39,6 @@ my_f (const gsl_vector *v, void *params)
     double x, y;
     double fx, fy; /* fractional parts of x and y */
     double rval;
-    double steepness=3.0;
   
     x = gsl_vector_get(v, 0);
     y = gsl_vector_get(v, 1);
@@ -53,62 +53,76 @@ my_f (const gsl_vector *v, void *params)
 #endif
 
 int 
-main(void)
-{
+main(void){
   double par[5] = {1.0, 2.0, 10.0, 20.0, 30.0};
+  const size_t stateDim = 2; /**< dimension of state space */
+  const double tol = 1e-3;
+  const int maxItr = 100;
+  double initStepSize=2.0;
 
+  /* initial coordinates */
+  double initVal[stateDim];
+  initVal[0] = 5.0;
+  initVal[1] = 7.0;
+
+#if 0
   const gsl_multimin_fminimizer_type *T = 
     gsl_multimin_fminimizer_nmsimplex2;
-  gsl_multimin_fminimizer *s = NULL;
-  gsl_vector *ss, *x;
-  gsl_multimin_function minex_func;
+#else
+  const gsl_multimin_fminimizer_type *T = 
+    gsl_multimin_fminimizer_nmsimplex2rand;
+#endif
+  gsl_vector *x = gsl_vector_alloc (stateDim);
+  gsl_vector *ss = gsl_vector_alloc (stateDim);
 
-  int iter = 0;
-  int status;
-  double size;
+  unsigned i;
+  int status, itr = 0;
+  double size; 
 
   /* Starting point */
-  x = gsl_vector_alloc (2);
-  gsl_vector_set (x, 0, 5.0);
-  gsl_vector_set (x, 1, 7.0);
+  for(i=0; i<stateDim; ++i)
+      gsl_vector_set (x, i, initVal[i]);
 
-  /* Set initial step sizes to 1 */
-  ss = gsl_vector_alloc (2);
-  gsl_vector_set_all (ss, 1.0);
+  /* Set initial step sizes to initStepSize */
+  gsl_vector_set_all (ss, initStepSize);
 
   /* Initialize method and iterate */
-  minex_func.n = 2;
+  gsl_multimin_function minex_func;
+  minex_func.n = stateDim;
   minex_func.f = my_f;
   minex_func.params = par;
 
-  s = gsl_multimin_fminimizer_alloc (T, 2);
+  gsl_multimin_fminimizer *s = gsl_multimin_fminimizer_alloc (T, stateDim);
+  if(s==NULL) {
+      fprintf(stderr, "%s:%d: bad allocation\n", __FILE__,__LINE__);
+      exit(1);
+  }
   gsl_multimin_fminimizer_set (s, &minex_func, x, ss);
-
-  printf ("%5s %10s %10s %7s %8s\n", "iter",
+  printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(s));
+  printf ("%5s %10s %10s %7s %8s\n", "itr",
           "x", "y", "f", "size");
-  do
-    {
-      iter++;
+  do{
+      itr++;
       status = gsl_multimin_fminimizer_iterate(s);
-      
-      if (status) 
+      if(status) 
         break;
 
-      size = gsl_multimin_fminimizer_size (s);
-      status = gsl_multimin_test_size (size, 1e-2);
-
-      if (status == GSL_SUCCESS)
-        {
-          printf ("converged to minimum at\n");
-        }
+      size = gsl_multimin_fminimizer_size(s);
+      status = gsl_multimin_test_size(size, tol);
 
       printf ("%5d %10.3e %10.3e %7.3f %8.3f\n", 
-              iter,
-              gsl_vector_get (s->x, 0), 
-              gsl_vector_get (s->x, 1), 
+              itr,
+              gsl_vector_get(s->x, 0), 
+              gsl_vector_get(s->x, 1), 
               s->fval, size);
-    }
-  while (status == GSL_CONTINUE && iter < 100);
+  }while (status == GSL_CONTINUE && itr < maxItr);
+  switch(status) {
+  case GSL_SUCCESS:
+      printf("converged to minimum\n");
+      break;
+  default:
+      printf("no convergence: status=%d itr=%d\n", status, itr);
+  }
   
   gsl_vector_free(x);
   gsl_vector_free(ss);
