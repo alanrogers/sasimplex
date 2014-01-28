@@ -1,6 +1,20 @@
+static inline double ran_unif(unsigned long *seed);
+static int sasimplex_iterate(void *vstate, gsl_multimin_function * f,
+                             gsl_vector * x, double *size, double *fval,
+                             unsigned long *seed);
+
+static inline double 
+ran_unif(unsigned long *seed) {
+    unsigned long s = *seed;
+
+    *seed = (s * 69069 + 1) & 0xffffffffUL;
+    return (*seed) / 4294967296.0;
+}
+
 static int
 sasimplex_iterate(void *vstate, gsl_multimin_function * f,
-                  gsl_vector * x, double *size, double *fval) {
+                  gsl_vector * x, double *size, double *fval,
+                  unsigned long *seed) {
 
     /* Simplex iteration tries to minimize function f value */
     /* Includes corrections from Ivo Alxneit <ivo.alxneit@psi.ch> */
