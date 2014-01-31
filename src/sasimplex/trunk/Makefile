@@ -32,6 +32,10 @@ lib := -L/usr/local/lib -lgsl -lgslcblas -lpthread -lm
 .c.o:
 	$(CC) $(CFLAGS) $(incl) -c -o ${@F}  $<
 
+XSASIMPLEX := xsasimplex.o sasimplex.o
+xsasimplex : $(XSASIMPLEX)
+	$(CC) $(CFLAGS) -o $@ $(XSASIMPLEX) $(lib)
+
 XSIMPLEX := xsimplex.o
 xsimplex : $(XSIMPLEX)
 	$(CC) $(CFLAGS) -o $@ $(XSIMPLEX) $(lib)

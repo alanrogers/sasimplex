@@ -120,11 +120,11 @@ update_point(sasimplex_state_t * state, size_t i,
     gsl_vector_const_view x_orig = gsl_matrix_const_row(state->x1, i);
     const size_t P = state->x1->size1;
 
-    /* Compute delta = x - x_orig */
+    /* Compute state->delta = x - x_orig */
     gsl_vector_memcpy(state->delta, x);
     gsl_blas_daxpy(-1.0, &x_orig.vector, state->delta);
 
-    /* Compute xmc = x_orig - c */
+    /* Compute state->xmc = x_orig - c */
     gsl_vector_memcpy(state->xmc, &x_orig.vector);
     gsl_blas_daxpy(-1.0, state->center, state->xmc);
 
@@ -133,15 +133,16 @@ update_point(sasimplex_state_t * state, size_t i,
         double      d = gsl_blas_dnrm2(state->delta);
         double      xmcd;
 
+        /* increments state->S2 */
         gsl_blas_ddot(state->xmc, state->delta, &xmcd);
         state->S2 += (2.0 / P) * xmcd + ((P - 1.0) / P) * (d * d / P);
     }
 
-    /* Update center:  c' = c + (x - x_orig) / P */
-
+    /* Update state->center:  c' = c + (x - x_orig) / P */
     {
         double      alpha = 1.0 / P;
 
+        /* result goes in state->center */
         gsl_blas_daxpy(-alpha, &x_orig.vector, state->center);
         gsl_blas_daxpy(alpha, x, state->center);
     }
