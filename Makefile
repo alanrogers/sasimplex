@@ -5,7 +5,8 @@ opt := -DNDEBUG -O3  -finline-functions  # For full optimization
 #opt :=  -O0 -fno-inline-functions -DDEBUG     # For debugging
 #prof := -pg -rdynamic                    # For profiling
 prof :=
-incl := -I/usr/local/include -I/opt/local/include
+gsldir := $(HOME)/distrib/gsl-1.16
+incl := -I/usr/local/include -I/opt/local/include -I$(gsldir)
 
 CC := gcc
 
