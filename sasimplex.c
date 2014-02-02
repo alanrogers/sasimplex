@@ -41,6 +41,7 @@
    This implementation uses n+1 corner points in the simplex.
 */
 
+#include <stdio.h>
 #include <config.h>
 #include <stdlib.h>
 #include <time.h>
@@ -283,6 +284,7 @@ compute_size(sasimplex_state_t * state, const gsl_vector * center) {
 }
 
 static int sasimplex_alloc(void *vstate, size_t n) {
+	fprintf(stderr,"%s:%d: enter %s\n",__FILE__,__LINE__,__func__);
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
 
     if(n == 0) {
@@ -358,6 +360,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     state->rng = gsl_rng_alloc(gsl_rng_taus);
     gsl_rng_set(state->rng, 0);
 
+	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
     return GSL_SUCCESS;
 }
 
@@ -458,7 +461,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     const size_t n = f1->size;
     size_t      i;
     size_t      hi, s_hi, lo;
-    double      dhi, ds_hi, dlo;
+    double      dhi, ds_hi, dlo, hold;
     int         status;
     double      v, v2; /* unperturbed trial values */
     double      pv, pv2; /* unperturbed trial values */
@@ -477,10 +480,12 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     if(dhi < dlo) {    /* swap lo and hi */
         lo=1;
         hi=0;
-        ds_hi = dlo;
+		hold = lo;
         dlo = dhi;
-        dhi = ds_hi;
+        dhi = hold;
     }
+	ds_hi = dlo;
+	s_hi = lo;
 
     for(i = 2; i < n; i++) {
         v = gsl_vector_get(f1, i) + gsl_ran_exponential(state->rng, temp);
@@ -503,7 +508,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     pv = v - gsl_ran_exponential(state->rng, temp);
 
 
-    if(gsl_finite(pv) && v < dlo) {
+    if(gsl_finite(pv) && pv < dlo) {
         /* reflected point is lowest, try expansion */
         /*
          * In NR code, the following line (a call to amotsa) has
@@ -514,9 +519,16 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 
         if(gsl_finite(pv2) && pv2 < dlo) {
             update_point(state, hi, xc2, v2);
-            dhi = pv2;
+
+			/*
+			 * BUG: dhi should be v2 + r.v., not v2
+			 */
+            dhi = v2;
         } else {
             update_point(state, hi, xc, v);
+			/*
+			 * BUG: dhi should be v + r.v., not pv
+			 */
             dhi = pv;
         }
     } else if(!gsl_finite(pv) || pv > ds_hi) {
@@ -528,6 +540,9 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
              * highest point */
 
             update_point(state, hi, xc, v);
+			/*
+			 * BUG: dhi should be v + r.v., not v - r.v.
+			 */
             dhi = pv;
         }
 
@@ -538,6 +553,9 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 
         if(gsl_finite(pv2) && pv2 <= dhi) {
             update_point(state, hi, xc2, v2);
+			/*
+			 * BUG: dhi should be v2 + r.v., not v2 - r.v.
+			 */
             dhi = pv2;
         } else {
             /* contract the whole simplex about the best point */
@@ -552,7 +570,12 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
         /* trial point is better than second highest point.  Replace
          * highest point by it */
 
+		/* CHECK THIS!! Ought to be setting ds_hi and s_hi */
+
         update_point(state, hi, xc, v);
+		/*
+		 * BUG: dhi should be v + r.v., not v - r.v.
+		 */
         dhi = pv;
     }
 
