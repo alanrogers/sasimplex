@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <math.h>
+#include <time.h>
 #include <gsl/gsl_multimin.h>
+#include <gsl/gsl_rng.h>
 #include "sasimplex.h"
 
 /*
@@ -61,6 +63,7 @@ main(void){
   const int maxItr = 100;
   double initStepSize=2.0;
 
+
   /* initial coordinates */
   double initVal[stateDim];
   initVal[0] = 5.0;
@@ -98,7 +101,7 @@ main(void){
       fprintf(stderr, "%s:%d: bad allocation\n", __FILE__,__LINE__);
       exit(1);
   }
-  sasimplex_set_seed(s, 0); /* 0 ==> use clock */
+  sasimplex_init_rng(s, 0); /* 0 ==> use clock */
   gsl_multimin_fminimizer_set (s, &minex_func, x, ss);
   printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(s));
   printf ("%5s %10s %10s %7s %8s\n", "itr",
