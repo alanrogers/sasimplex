@@ -1,5 +1,6 @@
 /* multimin/sasimplex.c
- * 
+ *
+ * Copyright (C) 2014 Alan Rogers
  * Copyright (C) 2007, 2008, 2009 Brian Gough
  * Copyright (C) 2002 Tuomo Keskitalo, Ivo Alxneit
  * 
@@ -28,6 +29,9 @@
          + keep track of the center to avoid unnecessary computation
          + compute size as RMS value, allowing linear update on each step
            instead of recomputing from all N+1 vectors.
+   - This code is based on simplex2.c from version 1.16 of the Gnu
+     Scientific Library. Modified here by Alan Rogers to implemented
+     Simplex Simulated Annealing, as described by Press et al.
 */
 
 /* The Simplex method of Nelder and Mead, also known as the polytope
@@ -438,22 +442,28 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     double      dhi, ds_hi, dlo;
     int         status;
     double      val, val2;
+    double      temp = state->temperature;
 
     if(xc->size != x->size) {
         GSL_ERROR("incompatible size of x", GSL_EINVAL);
     }
 
     /* get index of highest, second highest and lowest point */
+    lo=0;
+    hi=1;
+    dlo = gsl_vector_get(f1, lo) - temp*ran_unif(&state->seed);
+    dhi = gsl_vector_get(f1, hi) - temp*ran_unif(&state->seed);
 
-    dhi = dlo = gsl_vector_get(f1, 0);
-    hi = 0;
-    lo = 0;
+    if(dhi < dlo) {    /* swap lo and hi */
+        lo=1;
+        hi=0;
+        ds_hi = dlo;
+        dlo = dhi;
+        dhi = ds_hi;
+    }
 
-    ds_hi = gsl_vector_get(f1, 1);
-    s_hi = 1;
-
-    for(i = 1; i < n; i++) {
-        val = (gsl_vector_get(f1, i));
+    for(i = 2; i < n; i++) {
+        val = gsl_vector_get(f1, i) - temp*ran_unif(&state->seed);
         if(val < dlo) {
             dlo = val;
             lo = i;
@@ -469,8 +479,12 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     }
 
     /* try reflecting the highest value point */
+    val = try_corner_move(-1.0, state, hi, xc, f)
+        + temp*ran_unif(&state->seed);
 
-    val = try_corner_move(-1.0, state, hi, xc, f);
+
+     STOPPED HERE NOT SURE PERTURBATIONS HAVE CORRECT SIGN.
+     NOT SURE WHETHER I NEED TO SAVE UNPERTURBED val.
 
     if(gsl_finite(val) && val < gsl_vector_get(f1, lo)) {
         /* reflected point is lowest, try expansion */
