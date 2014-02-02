@@ -9,7 +9,7 @@ GSL_VAR const gsl_multimin_fminimizer_type *
 GSL_VAR const gsl_multimin_fminimizer_type *
     gsl_multimin_fminimizer_sasimplexrand;
 
-void sasimplex_set_seed(void *vstate, unsigned long seed);
+void sasimplex_init_rng(void *vstate, unsigned long seed);
 
 #endif /* __GSL_SASIMPLEX_H__ */
 

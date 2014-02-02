@@ -47,12 +47,14 @@
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_multimin.h>
 #include <gsl/gsl_matrix_double.h>
+#include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
 #include "sasimplex.h"
 
 /**
  * This structure contains the state of the minimizer.
  * It is like that of nmsimplex2_state_t (in sasimplex2.c)
- * but adds a seed for the random number generator.
+ * but adds a random number generator.
  *
  * The field called "y1" in nmsimplex2 is called "f1" here to avoid
  * name conflict with the function "y1" in the C math library.
@@ -68,7 +70,7 @@ typedef struct {
     double      S2;
     double      temperature;    /* increase to flatten surface */
     unsigned long count;
-    unsigned long seed;         /* seed for random number generator */
+    gsl_rng     *rng;           /* random number generator */
 } sasimplex_state_t;
 
 static int
@@ -76,21 +78,29 @@ static int
 static double
 compute_size(sasimplex_state_t * state, const gsl_vector * center);
 
+
 /**
- * Set the random number seed (an unsigned long) in an object
- * of type sasimplex_state_t. If seed==0, then random number generator
- * is initialized using the clock as a seed.
+ * Initialize the random number generator, using seed. If seed==0,
+ * then random number generator is initialized using the clock as a
+ * seed. 
  */
 void
-sasimplex_set_seed(void *vstate, unsigned long seed) {
+sasimplex_init_rng(void *vstate, unsigned long seed) {
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
 
+
+
     if(seed == 0)
-        state->seed = (unsigned long) time((time_t) 0);
+        gsl_rng_set(state->rng, time(NULL));
     else
-        state->seed = seed;
+        gsl_rng_set(state->rng, seed);
 }
 
+/*
+ * This function alters only the value of vector xc. In
+ * sasimplex_iterate, however, xc is a synonym for state->ws1. Thus,
+ * try_corner_move alters state->ws1.
+ */
 static double
 try_corner_move(const double coeff,
                 const sasimplex_state_t * state,
@@ -102,8 +112,16 @@ try_corner_move(const double coeff,
      * return value 
      */
 
+    /* matrix x1 is the simplex, each row representing a vertex. */
     gsl_matrix *x1 = state->x1;
-    const size_t P = x1->size1;
+
+    /*
+     * P is the number of rows in matrix state->x1, which is the
+     * number of vertices in the simplex--n+1, where n is the
+     * dimension of the state vector.
+     */
+    const size_t P = x1->size1; 
+
     double      newval;
 
     /* xc = (1-coeff)*(P/(P-1)) * center(all) + ((P*coeff-1)/(P-1))*x_corner */
@@ -127,7 +145,6 @@ update_point(sasimplex_state_t * state, size_t i,
              const gsl_vector * x, double val) {
     gsl_vector_const_view x_orig = gsl_matrix_const_row(state->x1, i);
     const size_t P = state->x1->size1;
-    double tt = -state->temperature;
 
     /* Compute state->delta = x - x_orig */
     gsl_vector_memcpy(state->delta, x);
@@ -336,8 +353,10 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     }
 
     state->count = 0;
-    state->seed = 0;
     state->temperature = 0.0;
+
+    state->rng = gsl_rng_alloc(gsl_rng_taus);
+    gsl_rng_set(state->rng, 0);
 
     return GSL_SUCCESS;
 }
@@ -441,7 +460,8 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     size_t      hi, s_hi, lo;
     double      dhi, ds_hi, dlo;
     int         status;
-    double      val, val2;
+    double      v, v2; /* unperturbed trial values */
+    double      pv, pv2; /* unperturbed trial values */
     double      temp = state->temperature;
 
     if(xc->size != x->size) {
@@ -451,8 +471,8 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     /* get index of highest, second highest and lowest point */
     lo=0;
     hi=1;
-    dlo = gsl_vector_get(f1, lo) - temp*ran_unif(&state->seed);
-    dhi = gsl_vector_get(f1, hi) - temp*ran_unif(&state->seed);
+    dlo = gsl_vector_get(f1, lo) + gsl_ran_exponential(state->rng, temp);
+    dhi = gsl_vector_get(f1, hi) + gsl_ran_exponential(state->rng, temp);
 
     if(dhi < dlo) {    /* swap lo and hi */
         lo=1;
@@ -463,56 +483,62 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     }
 
     for(i = 2; i < n; i++) {
-        val = gsl_vector_get(f1, i) - temp*ran_unif(&state->seed);
-        if(val < dlo) {
-            dlo = val;
+        v = gsl_vector_get(f1, i) + gsl_ran_exponential(state->rng, temp);
+        if(v < dlo) {
+            dlo = v;
             lo = i;
-        } else if(val > dhi) {
+        } else if(v > dhi) {
             ds_hi = dhi;
             s_hi = hi;
-            dhi = val;
+            dhi = v;
             hi = i;
-        } else if(val > ds_hi) {
-            ds_hi = val;
+        } else if(v > ds_hi) {
+            ds_hi = v;
             s_hi = i;
         }
     }
 
     /* try reflecting the highest value point */
-    val = try_corner_move(-1.0, state, hi, xc, f)
-        + temp*ran_unif(&state->seed);
+    v = try_corner_move(-1.0, state, hi, xc, f);
+    pv = v - gsl_ran_exponential(state->rng, temp);
 
 
-     STOPPED HERE NOT SURE PERTURBATIONS HAVE CORRECT SIGN.
-     NOT SURE WHETHER I NEED TO SAVE UNPERTURBED val.
-
-    if(gsl_finite(val) && val < gsl_vector_get(f1, lo)) {
+    if(gsl_finite(pv) && v < dlo) {
         /* reflected point is lowest, try expansion */
+        /*
+         * In NR code, the following line (a call to amotsa) has
+         * +2.0 rather than -2.0. What is the difference?
+         */
+        v2 = try_corner_move(-2.0, state, hi, xc2, f);
+        pv2 = v2 - gsl_ran_exponential(state->rng, temp);
 
-        val2 = try_corner_move(-2.0, state, hi, xc2, f);
-
-        if(gsl_finite(val2) && val2 < gsl_vector_get(f1, lo)) {
-            update_point(state, hi, xc2, val2);
+        if(gsl_finite(pv2) && pv2 < dlo) {
+            update_point(state, hi, xc2, v2);
+            dhi = pv2;
         } else {
-            update_point(state, hi, xc, val);
+            update_point(state, hi, xc, v);
+            dhi = pv;
         }
-    } else if(!gsl_finite(val) || val > gsl_vector_get(f1, s_hi)) {
+    } else if(!gsl_finite(pv) || pv > ds_hi) {
         /* reflection does not improve things enough, or we got a
          * non-finite function value */
 
-        if(gsl_finite(val) && val <= gsl_vector_get(f1, hi)) {
+        if(gsl_finite(v) && pv <= dhi) {
             /* if trial point is better than highest point, replace
              * highest point */
 
-            update_point(state, hi, xc, val);
+            update_point(state, hi, xc, v);
+            dhi = pv;
         }
 
         /* try one-dimensional contraction */
 
-        val2 = try_corner_move(0.5, state, hi, xc2, f);
+        v2 = try_corner_move(0.5, state, hi, xc2, f);
+        pv2 = v2 - gsl_ran_exponential(state->rng, temp);
 
-        if(gsl_finite(val2) && val2 <= gsl_vector_get(f1, hi)) {
-            update_point(state, hi, xc2, val2);
+        if(gsl_finite(pv2) && pv2 <= dhi) {
+            update_point(state, hi, xc2, v2);
+            dhi = pv2;
         } else {
             /* contract the whole simplex about the best point */
 
@@ -526,17 +552,16 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
         /* trial point is better than second highest point.  Replace
          * highest point by it */
 
-        update_point(state, hi, xc, val);
+        update_point(state, hi, xc, v);
+        dhi = pv;
     }
 
     /* return lowest point of simplex as x */
-
     lo = gsl_vector_min_index(f1);
     gsl_matrix_get_row(x, x1, lo);
     *fval = gsl_vector_get(f1, lo);
 
     /* Update simplex size */
-
     {
         double      S2 = state->S2;
 
@@ -561,13 +586,6 @@ static const gsl_multimin_fminimizer_type sasimplex_type = { "sasimplex",   /* n
 
 const       gsl_multimin_fminimizer_type
     * gsl_multimin_fminimizer_sasimplex = &sasimplex_type;
-
-static inline double ran_unif(unsigned long *seed) {
-    unsigned long s = *seed;
-
-    *seed = (s * 69069 + 1) & 0xffffffffUL;
-    return (*seed) / 4294967296.0;
-}
 
 static int
 sasimplex_set_rand(void *vstate, gsl_multimin_function * f,
@@ -603,17 +621,11 @@ sasimplex_set_rand(void *vstate, gsl_multimin_function * f,
         gsl_matrix_view m =
             gsl_matrix_submatrix(state->x1, 1, 0, x->size, x->size);
 
-        /* generate a random orthornomal basis  */
-        if(state->seed == 0)
-            state->seed = state->count ^ 0x12345678;
-
-        ran_unif(&state->seed);        /* warm it up */
-
         gsl_matrix_set_identity(&m.matrix);
 
         /* start with random reflections */
         for(i = 0; i < x->size; i++) {
-            double      s = ran_unif(&state->seed);
+            double      s = gsl_rng_uniform_pos(state->rng);
 
             if(s > 0.5)
                 gsl_matrix_set(&m.matrix, i, i, -1.0);
@@ -623,7 +635,7 @@ sasimplex_set_rand(void *vstate, gsl_multimin_function * f,
         for(i = 0; i < x->size; i++) {
             for(j = i + 1; j < x->size; j++) {
                 /* rotate columns i and j by a random angle */
-                double      angle = 2.0 * M_PI * ran_unif(&state->seed);
+                double      angle = 2.0 * M_PI * gsl_rng_uniform(state->rng);
                 double      c = cos(angle), s = sin(angle);
                 gsl_vector_view c_i = gsl_matrix_column(&m.matrix, i);
                 gsl_vector_view c_j = gsl_matrix_column(&m.matrix, j);
