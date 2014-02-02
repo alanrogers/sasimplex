@@ -49,16 +49,20 @@
  * This structure contains the state of the minimizer.
  * It is like that of nmsimplex2_state_t (in sasimplex2.c)
  * but adds a seed for the random number generator.
+ *
+ * The field called "y1" in nmsimplex2 is called "f1" here to avoid
+ * name conflict with the function "y1" in the C math library.
  */
 typedef struct {
     gsl_matrix *x1;             /* simplex corner points */
-    gsl_vector *y1;             /* function value at corner points */
+    gsl_vector *f1;             /* function value at corner points */
     gsl_vector *ws1;            /* workspace 1 for algorithm */
     gsl_vector *ws2;            /* workspace 2 for algorithm */
     gsl_vector *center;         /* center of all points */
     gsl_vector *delta;          /* current step */
     gsl_vector *xmc;            /* x - center (workspace) */
     double      S2;
+    double      temperature;    /* increase to flatten surface */
     unsigned long count;
     unsigned long seed;         /* seed for random number generator */
 } sasimplex_state_t;
@@ -148,7 +152,7 @@ update_point(sasimplex_state_t * state, size_t i,
     }
 
     gsl_matrix_set_row(state->x1, i, x);
-    gsl_vector_set(state->y1, i, val);
+    gsl_vector_set(state->f1, i, val);
 }
 
 static int
@@ -163,7 +167,7 @@ contract_by_best(sasimplex_state_t * state, size_t best,
     /* the xc vector is simply work space here */
 
     gsl_matrix *x1 = state->x1;
-    gsl_vector *y1 = state->y1;
+    gsl_vector *f1 = state->f1;
 
     size_t      i, j;
     double      newval;
@@ -182,7 +186,7 @@ contract_by_best(sasimplex_state_t * state, size_t best,
 
             gsl_matrix_get_row(xc, x1, i);
             newval = GSL_MULTIMIN_FN_EVAL(f, xc);
-            gsl_vector_set(y1, i, newval);
+            gsl_vector_set(f1, i, newval);
 
             /* notify caller that we found at least one bad function value.
              * we finish the contraction (and do not abort) to allow the user
@@ -269,9 +273,9 @@ static int sasimplex_alloc(void *vstate, size_t n) {
         GSL_ERROR("failed to allocate space for x1", GSL_ENOMEM);
     }
 
-    state->y1 = gsl_vector_alloc(n + 1);
+    state->f1 = gsl_vector_alloc(n + 1);
 
-    if(state->y1 == NULL) {
+    if(state->f1 == NULL) {
         gsl_matrix_free(state->x1);
         GSL_ERROR("failed to allocate space for y", GSL_ENOMEM);
     }
@@ -280,7 +284,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
 
     if(state->ws1 == NULL) {
         gsl_matrix_free(state->x1);
-        gsl_vector_free(state->y1);
+        gsl_vector_free(state->f1);
         GSL_ERROR("failed to allocate space for ws1", GSL_ENOMEM);
     }
 
@@ -288,7 +292,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
 
     if(state->ws2 == NULL) {
         gsl_matrix_free(state->x1);
-        gsl_vector_free(state->y1);
+        gsl_vector_free(state->f1);
         gsl_vector_free(state->ws1);
         GSL_ERROR("failed to allocate space for ws2", GSL_ENOMEM);
     }
@@ -297,7 +301,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
 
     if(state->center == NULL) {
         gsl_matrix_free(state->x1);
-        gsl_vector_free(state->y1);
+        gsl_vector_free(state->f1);
         gsl_vector_free(state->ws1);
         gsl_vector_free(state->ws2);
         GSL_ERROR("failed to allocate space for center", GSL_ENOMEM);
@@ -307,7 +311,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
 
     if(state->delta == NULL) {
         gsl_matrix_free(state->x1);
-        gsl_vector_free(state->y1);
+        gsl_vector_free(state->f1);
         gsl_vector_free(state->ws1);
         gsl_vector_free(state->ws2);
         gsl_vector_free(state->center);
@@ -318,7 +322,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
 
     if(state->xmc == NULL) {
         gsl_matrix_free(state->x1);
-        gsl_vector_free(state->y1);
+        gsl_vector_free(state->f1);
         gsl_vector_free(state->ws1);
         gsl_vector_free(state->ws2);
         gsl_vector_free(state->center);
@@ -328,6 +332,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
 
     state->count = 0;
     state->seed = 0;
+    state->temperature = 0.0;
 
     return GSL_SUCCESS;
 }
@@ -336,7 +341,7 @@ static void sasimplex_free(void *vstate) {
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
 
     gsl_matrix_free(state->x1);
-    gsl_vector_free(state->y1);
+    gsl_vector_free(state->f1);
     gsl_vector_free(state->ws1);
     gsl_vector_free(state->ws2);
     gsl_vector_free(state->center);
@@ -373,7 +378,7 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
     }
 
     gsl_matrix_set_row(state->x1, 0, x);
-    gsl_vector_set(state->y1, 0, val);
+    gsl_vector_set(state->f1, 0, val);
 
     /* following points are initialized to x0 + step_size */
 
@@ -397,7 +402,7 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
         }
 
         gsl_matrix_set_row(state->x1, i + 1, xtemp);
-        gsl_vector_set(state->y1, i + 1, val);
+        gsl_vector_set(state->f1, i + 1, val);
     }
 
     compute_center(state, state->center);
@@ -423,10 +428,10 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 
     gsl_vector *xc = state->ws1;
     gsl_vector *xc2 = state->ws2;
-    gsl_vector *y1 = state->y1;
+    gsl_vector *f1 = state->f1;
     gsl_matrix *x1 = state->x1;
 
-    const size_t n = y1->size;
+    const size_t n = f1->size;
     size_t      i;
     size_t      hi, s_hi, lo;
     double      dhi, ds_hi, dlo;
@@ -439,15 +444,15 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 
     /* get index of highest, second highest and lowest point */
 
-    dhi = dlo = gsl_vector_get(y1, 0);
+    dhi = dlo = gsl_vector_get(f1, 0);
     hi = 0;
     lo = 0;
 
-    ds_hi = gsl_vector_get(y1, 1);
+    ds_hi = gsl_vector_get(f1, 1);
     s_hi = 1;
 
     for(i = 1; i < n; i++) {
-        val = (gsl_vector_get(y1, i));
+        val = (gsl_vector_get(f1, i));
         if(val < dlo) {
             dlo = val;
             lo = i;
@@ -466,21 +471,21 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 
     val = try_corner_move(-1.0, state, hi, xc, f);
 
-    if(gsl_finite(val) && val < gsl_vector_get(y1, lo)) {
+    if(gsl_finite(val) && val < gsl_vector_get(f1, lo)) {
         /* reflected point is lowest, try expansion */
 
         val2 = try_corner_move(-2.0, state, hi, xc2, f);
 
-        if(gsl_finite(val2) && val2 < gsl_vector_get(y1, lo)) {
+        if(gsl_finite(val2) && val2 < gsl_vector_get(f1, lo)) {
             update_point(state, hi, xc2, val2);
         } else {
             update_point(state, hi, xc, val);
         }
-    } else if(!gsl_finite(val) || val > gsl_vector_get(y1, s_hi)) {
+    } else if(!gsl_finite(val) || val > gsl_vector_get(f1, s_hi)) {
         /* reflection does not improve things enough, or we got a
          * non-finite function value */
 
-        if(gsl_finite(val) && val <= gsl_vector_get(y1, hi)) {
+        if(gsl_finite(val) && val <= gsl_vector_get(f1, hi)) {
             /* if trial point is better than highest point, replace
              * highest point */
 
@@ -491,7 +496,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 
         val2 = try_corner_move(0.5, state, hi, xc2, f);
 
-        if(gsl_finite(val2) && val2 <= gsl_vector_get(y1, hi)) {
+        if(gsl_finite(val2) && val2 <= gsl_vector_get(f1, hi)) {
             update_point(state, hi, xc2, val2);
         } else {
             /* contract the whole simplex about the best point */
@@ -511,9 +516,9 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 
     /* return lowest point of simplex as x */
 
-    lo = gsl_vector_min_index(y1);
+    lo = gsl_vector_min_index(f1);
     gsl_matrix_get_row(x, x1, lo);
-    *fval = gsl_vector_get(y1, lo);
+    *fval = gsl_vector_get(f1, lo);
 
     /* Update simplex size */
 
@@ -577,14 +582,14 @@ sasimplex_set_rand(void *vstate, gsl_multimin_function * f,
     }
 
     gsl_matrix_set_row(state->x1, 0, x);
-    gsl_vector_set(state->y1, 0, val);
+    gsl_vector_set(state->f1, 0, val);
 
     {
         gsl_matrix_view m =
             gsl_matrix_submatrix(state->x1, 1, 0, x->size, x->size);
 
         /* generate a random orthornomal basis  */
-        if(state->seed = 0)
+        if(state->seed == 0)
             state->seed = state->count ^ 0x12345678;
 
         ran_unif(&state->seed);        /* warm it up */
@@ -639,7 +644,7 @@ sasimplex_set_rand(void *vstate, gsl_multimin_function * f,
                           GSL_EBADFUNC);
             }
 
-            gsl_vector_set(state->y1, i + 1, val);
+            gsl_vector_set(state->f1, i + 1, val);
         }
     }
 
