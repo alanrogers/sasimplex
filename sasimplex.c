@@ -123,6 +123,7 @@ update_point(sasimplex_state_t * state, size_t i,
              const gsl_vector * x, double val) {
     gsl_vector_const_view x_orig = gsl_matrix_const_row(state->x1, i);
     const size_t P = state->x1->size1;
+    double tt = -state->temperature;
 
     /* Compute state->delta = x - x_orig */
     gsl_vector_memcpy(state->delta, x);
