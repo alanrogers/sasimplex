@@ -37,7 +37,7 @@ XSASIMPLEX := xsasimplex.o sasimplex.o
 xsasimplex : $(XSASIMPLEX)
 	$(CC) $(CFLAGS) -o $@ $(XSASIMPLEX) $(lib)
 
-XSIMPLEX := xsimplex.o
+XSIMPLEX := xsimplex.o simplex2.c
 xsimplex : $(XSIMPLEX)
 	$(CC) $(CFLAGS) -o $@ $(XSIMPLEX) $(lib)
 
