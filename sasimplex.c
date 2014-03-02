@@ -365,6 +365,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
 }
 
 static void sasimplex_free(void *vstate) {
+	fprintf(stderr,"%s:%d: enter %s\n",__FILE__,__LINE__,__func__);
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
 
     gsl_matrix_free(state->x1);
@@ -374,12 +375,14 @@ static void sasimplex_free(void *vstate) {
     gsl_vector_free(state->center);
     gsl_vector_free(state->delta);
     gsl_vector_free(state->xmc);
+	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
 }
 
 static int
 sasimplex_set(void *vstate, gsl_multimin_function * f,
               const gsl_vector * x,
               double *size, const gsl_vector * step_size) {
+	fprintf(stderr,"%s:%d: enter %s\n",__FILE__,__LINE__,__func__);
     int         status;
     size_t      i;
     double      val;
@@ -439,6 +442,7 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
 
     state->count++;
 
+	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
     return GSL_SUCCESS;
 }
 
@@ -446,6 +450,7 @@ static int
 sasimplex_iterate(void *vstate, gsl_multimin_function * f,
                   gsl_vector * x, double *size, double *fval) {
 
+	fprintf(stderr,"%s:%d: enter %s\n",__FILE__,__LINE__,__func__);
     /* Simplex iteration tries to minimize function f value */
     /* Includes corrections from Ivo Alxneit <ivo.alxneit@psi.ch> */
 
@@ -596,6 +601,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
         }
     }
 
+	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
     return GSL_SUCCESS;
 }
 
