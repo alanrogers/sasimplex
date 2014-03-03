@@ -92,8 +92,9 @@ sasimplex_init_rng(void *vstate, unsigned long seed) {
     if(seed == 0)
 		seed = time(NULL);
 
-	fprintf(stderr,"%s:%d:%s: setting state->rng=%p; seed=%lu\n",
-			__FILE__,__LINE__,__func__, state->rng, seed);
+	fprintf(stderr,
+			"%s:%d:%s: calling gsl_rng_set; state=%p state->rng=%p; seed=%lu\n",
+			__FILE__,__LINE__,__func__, state, state->rng, seed);
 	if(state->rng == NULL) {
 		fprintf(stderr,"%s:%d: state->rng is NULL\n",
 				__FILE__,__LINE__);
@@ -383,8 +384,9 @@ static int sasimplex_alloc(void *vstate, size_t n) {
         GSL_ERROR("failed to allocate space for rng", GSL_ENOMEM);
 	}
 
-	fprintf(stderr,"%s:%d:%s: after gsl_rng_alloc, state->rng=%p\n",
-			__FILE__,__LINE__,__func__, state->rng);
+	fprintf(stderr,
+			"%s:%d:%s: after gsl_rng_alloc, state=%p state->rng=%p\n",
+			__FILE__,__LINE__,__func__, state, state->rng);
 
 	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
     return GSL_SUCCESS;
