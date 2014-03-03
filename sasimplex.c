@@ -89,12 +89,10 @@ void
 sasimplex_init_rng(void *vstate, unsigned long seed) {
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
 
-
-
     if(seed == 0)
-        gsl_rng_set(state->rng, time(NULL));
-    else
-        gsl_rng_set(state->rng, seed);
+		seed = time(NULL);
+
+	gsl_rng_set(state->rng, seed);
 }
 
 /*
@@ -357,8 +355,16 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     state->count = 0;
     state->temperature = 0.0;
 
+	/*
+	 * Note: state->rng is allocated but not initialized. This means that
+	 * it will get the default seed and will generate the same sequence
+	 * of numbers each time the program is run. To change this, call
+	 *
+	 *    sasimplex_init_rng(s, myseed);
+	 *
+	 * after allocating an object of type sasimplex.
+	 */
     state->rng = gsl_rng_alloc(gsl_rng_taus);
-    gsl_rng_set(state->rng, 0);
 
 	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
     return GSL_SUCCESS;

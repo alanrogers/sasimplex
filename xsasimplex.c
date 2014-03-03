@@ -69,7 +69,7 @@ main(void){
   initVal[0] = 5.0;
   initVal[1] = 7.0;
 
-#if 0
+#if 1
   const gsl_multimin_fminimizer_type *T = 
     gsl_multimin_fminimizer_sasimplex;
 #else
@@ -101,7 +101,7 @@ main(void){
       fprintf(stderr, "%s:%d: bad allocation\n", __FILE__,__LINE__);
       exit(1);
   }
-  sasimplex_init_rng(s, 0); /* 0 ==> use clock */
+  sasimplex_init_rng(s, 123); /* 0 ==> use clock */
   gsl_multimin_fminimizer_set (s, &minex_func, x, ss);
   printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(s));
   printf ("%5s %10s %10s %7s %8s\n", "itr",
