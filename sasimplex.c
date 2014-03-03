@@ -92,6 +92,12 @@ sasimplex_init_rng(void *vstate, unsigned long seed) {
     if(seed == 0)
 		seed = time(NULL);
 
+	fprintf(stderr,"%s:%d:%s: setting state->rng=%p; seed=%lu\n",
+			__FILE__,__LINE__,__func__, state->rng, seed);
+	if(state->rng == NULL) {
+		fprintf(stderr,"%s:%d: state->rng is NULL\n",
+				__FILE__,__LINE__);
+	}
 	gsl_rng_set(state->rng, seed);
 }
 
@@ -356,15 +362,29 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     state->temperature = 0.0;
 
 	/*
-	 * Note: state->rng is allocated but not initialized. This means that
-	 * it will get the default seed and will generate the same sequence
-	 * of numbers each time the program is run. To change this, call
+	 * The line below allocates a random number generator and
+	 * initializes it with a default seed. It should be initialized
+	 * later with a call to
 	 *
 	 *    sasimplex_init_rng(s, myseed);
 	 *
-	 * after allocating an object of type sasimplex.
+	 * Otherwise, the random number generator will produce the same
+	 * sequence of numbers each time the program is run.
 	 */
     state->rng = gsl_rng_alloc(gsl_rng_taus);
+	if(state->rng == NULL) {
+        gsl_matrix_free(state->x1);
+        gsl_vector_free(state->f1);
+        gsl_vector_free(state->ws1);
+        gsl_vector_free(state->ws2);
+        gsl_vector_free(state->center);
+        gsl_vector_free(state->delta);
+		gsl_vector_free(state->xmc);
+        GSL_ERROR("failed to allocate space for rng", GSL_ENOMEM);
+	}
+
+	fprintf(stderr,"%s:%d:%s: after gsl_rng_alloc, state->rng=%p\n",
+			__FILE__,__LINE__,__func__, state->rng);
 
 	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
     return GSL_SUCCESS;
@@ -381,6 +401,7 @@ static void sasimplex_free(void *vstate) {
     gsl_vector_free(state->center);
     gsl_vector_free(state->delta);
     gsl_vector_free(state->xmc);
+	gsl_rng_free(state->rng);
 	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
 }
 
@@ -611,7 +632,8 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     return GSL_SUCCESS;
 }
 
-static const gsl_multimin_fminimizer_type sasimplex_type = { "sasimplex",   /* name */
+static const gsl_multimin_fminimizer_type sasimplex_type = {
+	"sasimplex",   /* name */
     sizeof(sasimplex_state_t),
     &sasimplex_alloc,
     &sasimplex_set,
@@ -720,7 +742,8 @@ sasimplex_set_rand(void *vstate, gsl_multimin_function * f,
     return GSL_SUCCESS;
 }
 
-static const gsl_multimin_fminimizer_type sasimplexrand_type = { "sasimplexrand",   /* name */
+static const gsl_multimin_fminimizer_type sasimplexrand_type = {
+	"sasimplexrand",   /* name */
     sizeof(sasimplex_state_t),
     &sasimplex_alloc,
     &sasimplex_set_rand,
