@@ -14,26 +14,8 @@
 
 double my_f (const gsl_vector *v, void *params);
 
-#if 0
 /*
- * Paraboloid centered on (p[0],p[1]), with scale factors (p[2],p[3])
- * and minimum p[4]
- */
-double
-my_f (const gsl_vector *v, void *params)
-{
-  double x, y;
-  double *p = (double *)params;
-  
-  x = gsl_vector_get(v, 0);
-  y = gsl_vector_get(v, 1);
- 
-  return p[2] * (x - p[0]) * (x - p[0]) +
-           p[3] * (y - p[1]) * (y - p[1]) + p[4]; 
-}
-#else
-/*
- * Multiple minima whereever x and y are integers. Global minimum
+ * Multiple minima wherever x and y are integers. Global minimum
  * at (x,y)=(0,0)
  */
 double
@@ -51,25 +33,24 @@ my_f (const gsl_vector *v, void *params)
     rval = 1.0 + fabs(fx) + fabs(fy);
     rval *= 1.0 + fabs(x) + fabs(y);
     
-     return rval; 
+    return rval; 
 }
-#endif
 
 int 
 main(void){
   double par[5] = {1.0, 2.0, 10.0, 20.0, 30.0};
   const size_t stateDim = 2; /**< dimension of state space */
-  const double tol = 1e-3;
-  const int maxItr = 100;
-  double initStepSize=2.0;
-
+  const double tol = 1e-4;
+  const int maxItr = 1000;
+  double temperature = 10.0;
+  double initStepSize=1.0;
 
   /* initial coordinates */
   double initVal[stateDim];
-  initVal[0] = 5.0;
-  initVal[1] = 7.0;
+  initVal[0] = 5.5;
+  initVal[1] = 7.5;
 
-#if 1
+#if 0
   const gsl_multimin_fminimizer_type *T = 
     gsl_multimin_fminimizer_sasimplex;
 #else
@@ -101,16 +82,21 @@ main(void){
       fprintf(stderr, "%s:%d: bad allocation\n", __FILE__,__LINE__);
       exit(1);
   }
-  sasimplex_init_rng(s, 123); /* 0 ==> use clock */
+  sasimplex_seed_rng(s, 0); /* 0 ==> use clock */
+  sasimplex_set_temp(s, temperature);
   gsl_multimin_fminimizer_set (s, &minex_func, x, ss);
   printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(s));
+  printf("%s:%d: temperature=%lf\n", __FILE__,__LINE__,temperature);
   printf ("%5s %10s %10s %7s %8s\n", "itr",
           "x", "y", "f", "size");
   do{
       itr++;
       status = gsl_multimin_fminimizer_iterate(s);
-      if(status) 
-        break;
+      if(status) {
+          printf("%s:%d:%s: rtn val %d from gsl_multimin_fminimizer_iterate\n",
+                 __FILE__,__LINE__,__func__,status);
+          break;
+      }
 
       size = gsl_multimin_fminimizer_size(s);
       status = gsl_multimin_test_size(size, tol);
@@ -120,6 +106,11 @@ main(void){
               gsl_vector_get(s->x, 0), 
               gsl_vector_get(s->x, 1), 
               s->fval, size);
+      if(temperature > 0.0 && itr % 10 == 0) {
+          temperature -= 1.0;
+          sasimplex_set_temp(s, temperature);
+          printf("%s:%d: temperature=%lf\n", __FILE__,__LINE__,temperature);
+      }
   }while (status == GSL_CONTINUE && itr < maxItr);
   switch(status) {
   case GSL_SUCCESS:
