@@ -9,8 +9,8 @@ GSL_VAR const gsl_multimin_fminimizer_type *
 GSL_VAR const gsl_multimin_fminimizer_type *
     gsl_multimin_fminimizer_sasimplexrand;
 
-void
-sasimplex_init_rng(gsl_multimin_fminimizer *fmin, unsigned long seed);
+void sasimplex_seed_rng(gsl_multimin_fminimizer *minimizer, unsigned long seed);
+void sasimplex_set_temp(gsl_multimin_fminimizer *minimizer, double temperature);
 
 #endif /* __GSL_SASIMPLEX_H__ */
 

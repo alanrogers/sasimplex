@@ -86,20 +86,30 @@ compute_size(sasimplex_state_t * state, const gsl_vector * center);
  * seed. 
  */
 void
-sasimplex_init_rng(gsl_multimin_fminimizer *fmin, unsigned long seed) {
-    sasimplex_state_t *state = (sasimplex_state_t *) fmin->state;
+sasimplex_seed_rng(gsl_multimin_fminimizer *minimizer, unsigned long seed) {
+    sasimplex_state_t *state = (sasimplex_state_t *) minimizer->state;
 
     if(seed == 0)
 		seed = time(NULL);
 
+#if 0    
 	fprintf(stderr,
 			"%s:%d:%s: calling gsl_rng_set; state=%p state->rng=%p; seed=%lu\n",
 			__FILE__,__LINE__,__func__, state, state->rng, seed);
+#endif
 	if(state->rng == NULL) {
 		fprintf(stderr,"%s:%d: state->rng is NULL\n",
 				__FILE__,__LINE__);
 	}
 	gsl_rng_set(state->rng, seed);
+}
+
+/** Set temperature. */
+void
+sasimplex_set_temp(gsl_multimin_fminimizer *minimizer, double temperature) {
+    sasimplex_state_t *state = (sasimplex_state_t *) minimizer->state;
+
+    state->temperature = temperature;
 }
 
 /*
@@ -289,7 +299,9 @@ compute_size(sasimplex_state_t * state, const gsl_vector * center) {
 }
 
 static int sasimplex_alloc(void *vstate, size_t n) {
+#if 0    
 	fprintf(stderr,"%s:%d: enter %s\n",__FILE__,__LINE__,__func__);
+#endif
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
 
     if(n == 0) {
@@ -367,7 +379,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
 	 * initializes it with a default seed. It should be initialized
 	 * later with a call to
 	 *
-	 *    sasimplex_init_rng(s, myseed);
+	 *    sasimplex_seed_rng(s, myseed);
 	 *
 	 * Otherwise, the random number generator will produce the same
 	 * sequence of numbers each time the program is run.
@@ -384,16 +396,20 @@ static int sasimplex_alloc(void *vstate, size_t n) {
         GSL_ERROR("failed to allocate space for rng", GSL_ENOMEM);
 	}
 
+#if 0    
 	fprintf(stderr,
 			"%s:%d:%s: after gsl_rng_alloc, state=%p state->rng=%p\n",
 			__FILE__,__LINE__,__func__, state, state->rng);
 
 	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
+#endif
     return GSL_SUCCESS;
 }
 
 static void sasimplex_free(void *vstate) {
+#if 0    
 	fprintf(stderr,"%s:%d: enter %s\n",__FILE__,__LINE__,__func__);
+#endif
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
 
     gsl_matrix_free(state->x1);
@@ -404,14 +420,18 @@ static void sasimplex_free(void *vstate) {
     gsl_vector_free(state->delta);
     gsl_vector_free(state->xmc);
 	gsl_rng_free(state->rng);
+#if 0    
 	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
+#endif
 }
 
 static int
 sasimplex_set(void *vstate, gsl_multimin_function * f,
               const gsl_vector * x,
               double *size, const gsl_vector * step_size) {
+#if 0    
 	fprintf(stderr,"%s:%d: enter %s\n",__FILE__,__LINE__,__func__);
+#endif
     int         status;
     size_t      i;
     double      val;
@@ -471,7 +491,9 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
 
     state->count++;
 
+#if 0    
 	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
+#endif
     return GSL_SUCCESS;
 }
 
@@ -479,7 +501,9 @@ static int
 sasimplex_iterate(void *vstate, gsl_multimin_function * f,
                   gsl_vector * x, double *size, double *fval) {
 
+#if 0    
 	fprintf(stderr,"%s:%d: enter %s\n",__FILE__,__LINE__,__func__);
+#endif
     /* Simplex iteration tries to minimize function f value */
     /* Includes corrections from Ivo Alxneit <ivo.alxneit@psi.ch> */
 
@@ -630,7 +654,9 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
         }
     }
 
+#if 0    
 	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
+#endif
     return GSL_SUCCESS;
 }
 
