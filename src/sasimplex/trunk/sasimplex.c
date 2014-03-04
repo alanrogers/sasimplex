@@ -86,8 +86,8 @@ compute_size(sasimplex_state_t * state, const gsl_vector * center);
  * seed. 
  */
 void
-sasimplex_init_rng(void *vstate, unsigned long seed) {
-    sasimplex_state_t *state = (sasimplex_state_t *) vstate;
+sasimplex_init_rng(gsl_multimin_fminimizer *fmin, unsigned long seed) {
+    sasimplex_state_t *state = (sasimplex_state_t *) fmin->state;
 
     if(seed == 0)
 		seed = time(NULL);
