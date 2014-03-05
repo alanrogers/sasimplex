@@ -570,16 +570,9 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 
         if(gsl_finite(pv2) && pv2 < dlo) {
             update_point(state, hi, xc2, v2);
-
-			/*
-			 * BUG: dhi should be v2 + r.v., not v2
-			 */
-            dhi = v2;
+            dhi = pv2;
         } else {
             update_point(state, hi, xc, v);
-			/*
-			 * BUG: dhi should be v + r.v., not pv
-			 */
             dhi = pv;
         }
     } else if(!gsl_finite(pv) || pv > ds_hi) {
@@ -591,9 +584,6 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
              * highest point */
 
             update_point(state, hi, xc, v);
-			/*
-			 * BUG: dhi should be v + r.v., not v - r.v.
-			 */
             dhi = pv;
         }
 
@@ -604,9 +594,6 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 
         if(gsl_finite(pv2) && pv2 <= dhi) {
             update_point(state, hi, xc2, v2);
-			/*
-			 * BUG: dhi should be v2 + r.v., not v2 - r.v.
-			 */
             dhi = pv2;
         } else {
             /* contract the whole simplex about the best point */
@@ -624,9 +611,6 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 		/* CHECK THIS!! Ought to be setting ds_hi and s_hi */
 
         update_point(state, hi, xc, v);
-		/*
-		 * BUG: dhi should be v + r.v., not v - r.v.
-		 */
         dhi = pv;
     }
 
