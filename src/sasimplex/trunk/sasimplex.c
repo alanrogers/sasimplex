@@ -597,8 +597,8 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     size_t      hi, s_hi, lo;
     double      dhi, ds_hi, dlo, hold;
     int         status;
-    double      v, v2; /* unperturbed trial values */
-    double      pv, pv2; /* unperturbed trial values */
+    double      v, v2;   /* unperturbed trial values */
+    double      pv, pv2; /* perturbed trial values */
     double      temp = state->temperature;
 
     if(xc->size != x->size) {
