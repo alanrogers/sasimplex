@@ -36,7 +36,6 @@ main(void){
     const size_t stateDim = 2; /**< dimension of state space */
     const double tol = 1e-4;
     const int maxItr = 1000;
-    double temperature = 10.0;
     double initStepSize=1.0;
 
     /* initial coordinates */
@@ -65,6 +64,14 @@ main(void){
     /* Set initial step sizes to initStepSize */
     gsl_vector_set_all (ss, initStepSize);
 
+	/* Set up annealing schedule */
+	sasimplex_schedule_t *sched =
+		sasimplex_schedule_alloc(10,  /* number of temperatures */
+								 100, /* iterations per temperature */
+								 10.0,/* initial temperature */
+								 0.5  /* ratio of adjacent temperatures */
+			);
+
     /* Initialize method and iterate */
     gsl_multimin_function minex_func;
     minex_func.n = stateDim;
@@ -77,18 +84,24 @@ main(void){
         exit(1);
     }
     sasimplex_seed_rng(s, 0); /* 0 ==> use clock */
-    sasimplex_set_temp(s, temperature);
     gsl_multimin_fminimizer_set (s, &minex_func, x, ss);
     printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(s));
-    printf("%s:%d: temperature=%lf\n", __FILE__,__LINE__,temperature);
     printf ("%5s %10s %10s %7s %8s\n", "itr",
             "x", "y", "f", "size");
     do{
+		double temperature;
+		if(sasimplex_schedule_done(sched))
+			break;
+		temperature = sasimplex_schedule_next(sched);
+		printf("temperature: %lf\n", temperature);
+		sasimplex_set_temp(s, temperature);
         itr++;
         status = gsl_multimin_fminimizer_iterate(s);
         if(status) {
-            printf("%s:%d:%s: rtn val %d from gsl_multimin_fminimizer_iterate\n",
-                   __FILE__,__LINE__,__func__,status);
+            printf("%s:%d:%s: rtn val %d from %s\n",
+                   __FILE__,__LINE__,__func__,
+				   status,
+				   "gsl_multimin_fminimizer_iterate");
             break;
         }
 
@@ -100,11 +113,6 @@ main(void){
                 gsl_vector_get(s->x, 0), 
                 gsl_vector_get(s->x, 1), 
                 s->fval, size);
-        if(temperature > 0.0 && itr % 10 == 0) {
-            temperature -= 1.0;
-            sasimplex_set_temp(s, temperature);
-            printf("%s:%d: temperature=%lf\n", __FILE__,__LINE__,temperature);
-        }
     }while (status == GSL_CONTINUE && itr < maxItr);
     switch(status) {
     case GSL_SUCCESS:

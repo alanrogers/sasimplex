@@ -74,10 +74,86 @@ typedef struct {
     gsl_rng     *rng;           /* random number generator */
 } sasimplex_state_t;
 
+/**
+ * This structure represents a schedule of annealing temperatures.
+ */
+struct sasimplex_schedule_t {
+	int nTemps;   /* number of temperature values */
+	int nPerTemp; /* iterations per temperature value */
+	int currTemp, currIteration;
+	int done;     /* flag to indicate whether we're done */
+	double *temp; /* array of temperature values */
+};
+
 static int
  compute_center(const sasimplex_state_t * state, gsl_vector * center);
 static double
 compute_size(sasimplex_state_t * state, const gsl_vector * center);
+
+/**
+ * Allocate and initialize annealing schedule for sasimplex.
+ *
+ * nTemps  : the number of temperatures
+ * nPerTemp: the number of iterations at each temperature
+ * initTemp: initial temperature
+ * deflationFactor: the ratio of temperature i+1 to temperature i
+ */
+sasimplex_schedule_t *
+sasimplex_schedule_alloc(int nTemps, int nPerTemp, double initTemp,
+						 double deflationFactor) {
+	int i;
+	sasimplex_schedule_t *s = malloc(sizeof(sasimplex_schedule_t));
+	if(s == NULL) {
+#if 0
+        GSL_ERROR("failed to allocate sasimplex_schedule_t", GSL_ENOMEM);
+#endif
+		fprintf(stderr,"bad malloc\n");
+		exit(1);
+	}
+	s->temp = malloc(nTemps * sizeof(s->temp[0]));
+	if(s->temp == NULL) {
+		free(s);
+#if 0
+        GSL_ERROR("failed to allocate annealing array", GSL_ENOMEM);
+#endif
+		fprintf(stderr,"bad malloc\n");
+		exit(1);
+	}
+
+	s->currIteration = s->currTemp = s->done = 0;
+	s->nTemps = nTemps;
+	s->nPerTemp = nPerTemp;
+	s->temp[0] = initTemp;
+	for(i=1; i < nTemps-1; ++i)
+		s->temp[i] = deflationFactor * s->temp[i-1];
+	s->temp[nTemps-1] = 0.0;
+	return s;
+}
+
+/** Are we done yet? */
+int sasimplex_schedule_done(sasimplex_schedule_t *s) {
+	return s->done;
+}
+
+/** Get next temperature */
+double sasimplex_schedule_next(sasimplex_schedule_t *s) {
+	double currTemp;
+	if( s->done ) {
+        GSL_ERROR("annealing schedule overrun", GSL_ETABLE);
+	}
+	currTemp = s->temp[s->currTemp];
+
+	++s->currIteration;
+	if(s->currIteration == s->nPerTemp) {
+		++s->currTemp;
+		s->currIteration = 0;
+		if(s->currTemp == s->nTemps) {
+			s->currTemp = 0;
+			s->done = 1;
+		}
+	}
+	return currTemp;
+}
 
 
 /**
