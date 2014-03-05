@@ -44,7 +44,6 @@
 #include <stdio.h>
 #include <config.h>
 #include <stdlib.h>
-#include <time.h>
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_multimin.h>
 #include <gsl/gsl_matrix_double.h>
@@ -74,99 +73,17 @@ typedef struct {
     gsl_rng     *rng;           /* random number generator */
 } sasimplex_state_t;
 
-/**
- * This structure represents a schedule of annealing temperatures.
- */
-struct sasimplex_schedule_t {
-	int nTemps;   /* number of temperature values */
-	int nPerTemp; /* iterations per temperature value */
-	int currTemp, currIteration;
-	int done;     /* flag to indicate whether we're done */
-	double *temp; /* array of temperature values */
-};
-
 static int
  compute_center(const sasimplex_state_t * state, gsl_vector * center);
 static double
 compute_size(sasimplex_state_t * state, const gsl_vector * center);
 
 /**
- * Allocate and initialize annealing schedule for sasimplex.
- *
- * nTemps  : the number of temperatures
- * nPerTemp: the number of iterations at each temperature
- * initTemp: initial temperature
- * deflationFactor: the ratio of temperature i+1 to temperature i
- */
-sasimplex_schedule_t *
-sasimplex_schedule_alloc(int nTemps, int nPerTemp, double initTemp,
-						 double deflationFactor) {
-	int i;
-	sasimplex_schedule_t *s = malloc(sizeof(sasimplex_schedule_t));
-	if(s == NULL) {
-#if 0
-        GSL_ERROR("failed to allocate sasimplex_schedule_t", GSL_ENOMEM);
-#endif
-		fprintf(stderr,"bad malloc\n");
-		exit(1);
-	}
-	s->temp = malloc(nTemps * sizeof(s->temp[0]));
-	if(s->temp == NULL) {
-		free(s);
-#if 0
-        GSL_ERROR("failed to allocate annealing array", GSL_ENOMEM);
-#endif
-		fprintf(stderr,"bad malloc\n");
-		exit(1);
-	}
-
-	s->currIteration = s->currTemp = s->done = 0;
-	s->nTemps = nTemps;
-	s->nPerTemp = nPerTemp;
-	s->temp[0] = initTemp;
-	for(i=1; i < nTemps-1; ++i)
-		s->temp[i] = deflationFactor * s->temp[i-1];
-	s->temp[nTemps-1] = 0.0;
-	return s;
-}
-
-/** Are we done yet? */
-int sasimplex_schedule_done(sasimplex_schedule_t *s) {
-	return s->done;
-}
-
-/** Get next temperature */
-double sasimplex_schedule_next(sasimplex_schedule_t *s) {
-	double currTemp;
-	if( s->done ) {
-        GSL_ERROR("annealing schedule overrun", GSL_ETABLE);
-	}
-	currTemp = s->temp[s->currTemp];
-
-	++s->currIteration;
-	if(s->currIteration == s->nPerTemp) {
-		++s->currTemp;
-		s->currIteration = 0;
-		if(s->currTemp == s->nTemps) {
-			s->currTemp = 0;
-			s->done = 1;
-		}
-	}
-	return currTemp;
-}
-
-
-/**
- * Initialize the random number generator, using seed. If seed==0,
- * then random number generator is initialized using the clock as a
- * seed. 
+ * Set seed of random number generator.
  */
 void
 sasimplex_seed_rng(gsl_multimin_fminimizer *minimizer, unsigned long seed) {
     sasimplex_state_t *state = (sasimplex_state_t *) minimizer->state;
-
-    if(seed == 0)
-		seed = time(NULL);
 
 #if 0    
 	fprintf(stderr,
@@ -645,8 +562,8 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     if(gsl_finite(pv) && pv < dlo) {
         /* reflected point is lowest, try expansion */
         /*
-         * In NR code, the following line (a call to amotsa) has
-         * +2.0 rather than -2.0. What is the difference?
+         * In NR code, the line analogous the the line below (a call
+         * to amotsa) has +2.0 rather than -2.0. What is the difference?
          */
         v2 = try_corner_move(-2.0, state, hi, xc2, f);
         pv2 = v2 - gsl_ran_exponential(state->rng, temp);
