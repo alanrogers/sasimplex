@@ -138,7 +138,7 @@ main(void){
 
 	/* Set up annealing schedule */
 	AnnealSched *sched =
-		AnnealSched_alloc(10,  /* number of temperatures */
+		AnnealSched_alloc(5,  /* number of temperatures */
 								 100, /* iterations per temperature */
 								 4.0,/* initial temperature */
 								 0.5  /* ratio of adjacent temperatures */
