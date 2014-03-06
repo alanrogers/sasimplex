@@ -104,11 +104,11 @@ my_f (const gsl_vector *v, void *params)
 
 int 
 main(void){
-    double par[2] = {1.0, 2.0}; /* (x,y) at minumum */
+    double par[2] = {3.0, 2.0}; /* (x,y) at minumum */
     const size_t stateDim = 2; /**< dimension of state space */
     const double tol = 1e-4;
     const int maxItr = 1000;
-    double initStepSize=0.1;
+    double initStepSize=0.05;
 
     /* initial coordinates */
     double initVal[stateDim];
@@ -159,8 +159,8 @@ main(void){
     sasimplex_seed_rng(s, seed); 
     gsl_multimin_fminimizer_set (s, &minex_func, x, ss);
     printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(s));
-    printf ("%5s %10s %10s %7s %8s %8s\n", "itr",
-            "x", "y", "f", "size", "temp");
+    printf ("%5s %10s %10s %7s %8s %8s %8s\n", "itr",
+            "x", "y", "f", "size", "MAE", "temp");
     do{
 		double temperature;
 		temperature = AnnealSched_next(sched);
@@ -178,11 +178,15 @@ main(void){
         size = gsl_multimin_fminimizer_size(s);
         status = gsl_multimin_test_size(size, tol);
 
-        printf ("%5d %10.3e %10.3e %7.3f %8.3f %8.4f\n", 
+		/* mae is mean absolute error */
+		double errx = gsl_vector_get(s->x, 0) - par[0];
+		double erry = gsl_vector_get(s->x, 1) - par[1];
+		double mae = 0.5*(fabs(errx) + fabs(erry));
+        printf ("%5d %10.3e %10.3e %7.3f %8.3f %8.4f %8.4f\n", 
                 itr,
                 gsl_vector_get(s->x, 0), 
                 gsl_vector_get(s->x, 1), 
-                s->fval, size, temperature);
+                s->fval, size, mae, temperature);
     }while (status == GSL_CONTINUE && itr < maxItr);
     switch(status) {
     case GSL_SUCCESS:
@@ -192,10 +196,7 @@ main(void){
         printf("no convergence: status=%d itr=%d\n", status, itr);
     }
     printf("True minimum: (%lf, %lf)\n", par[0], par[1]);
-	double errx = gsl_vector_get(s->x, 0) - par[0];
-	double erry = gsl_vector_get(s->x, 1) - par[1];
-    printf("MeanAbsErr: %lf\n", 0.5*(fabs(errx) + fabs(erry)));
-  
+ 
     gsl_vector_free(x);
     gsl_vector_free(ss);
     gsl_multimin_fminimizer_free (s);
