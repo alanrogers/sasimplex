@@ -499,11 +499,9 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 #endif
     /* Simplex iteration tries to minimize function f value */
     /* Includes corrections from Ivo Alxneit <ivo.alxneit@psi.ch> */
-
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
 
     /* xc and xc2 vectors store tried corner point coordinates */
-
     gsl_vector *xc = state->ws1;
     gsl_vector *xc2 = state->ws2;
     gsl_vector *f1 = state->f1;
@@ -511,7 +509,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 
     const size_t n = f1->size;
     size_t      i;
-    size_t      hi, s_hi, lo;
+    size_t      hi, lo;
     double      dhi, ds_hi, dlo, hold;
     int         status;
     double      v, v2;   /* unperturbed trial values */
@@ -522,7 +520,16 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
         GSL_ERROR("incompatible size of x", GSL_EINVAL);
     }
 
-    /* get index of highest, second highest and lowest point */
+    /*
+	 * Find highest, second highest and lowest point. We need the
+	 * indices (lo and hi) of the  low and high points, but we don't
+	 * need the index of the second highest. We need the function
+	 * values of all three.
+	 *
+	 * dlo, ds_hi, and dhi are function values at these three points,
+	 * perturbed upward by random amounts. They are thus somewhat
+	 * worse than the true function values.
+	 */
     lo=0;
     hi=1;
     dlo = gsl_vector_get(f1, lo) + gsl_ran_exponential(state->rng, temp);
@@ -536,7 +543,6 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
         dhi = hold;
     }
 	ds_hi = dlo;
-	s_hi = lo;
 
     for(i = 2; i < n; i++) {
         v = gsl_vector_get(f1, i) + gsl_ran_exponential(state->rng, temp);
@@ -545,25 +551,33 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
             lo = i;
         } else if(v > dhi) {
             ds_hi = dhi;
-            s_hi = hi;
             dhi = v;
             hi = i;
         } else if(v > ds_hi) {
             ds_hi = v;
-            s_hi = i;
         }
     }
 
-    /* try reflecting the highest value point */
+	/*
+	 * Try reflecting the highest value point.
+	 *
+	 * v is the true function value at the trial point and pv is the
+	 * perturbed version of that value. In contrast to the upward
+	 * perturbations in dlo, ds_hi, and dhi, the perturbation here is
+	 * downward, making the trial value a little better from the
+	 * perspective of the minimizer. This encourages the algorithm to
+	 * accept trial values--makes it eager to explore.
+	 */
     v = try_corner_move(-1.0, state, hi, xc, f);
     pv = v - gsl_ran_exponential(state->rng, temp);
 
 
     if(gsl_finite(pv) && pv < dlo) {
-        /* reflected point is lowest, try expansion */
         /*
-         * In NR code, the line analogous the the line below (a call
-         * to amotsa) has +2.0 rather than -2.0. What is the difference?
+		 * Reflected point is lowest, try expansion.  In the Numerical
+         * Recipes function amebsa, the analog of the the line below
+         * is a call to amotsa, but has +2.0 rather than -2.0. What is
+         * the difference?
          */
         v2 = try_corner_move(-2.0, state, hi, xc2, f);
         pv2 = v2 - gsl_ran_exponential(state->rng, temp);
@@ -588,7 +602,6 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
         }
 
         /* try one-dimensional contraction */
-
         v2 = try_corner_move(0.5, state, hi, xc2, f);
         pv2 = v2 - gsl_ran_exponential(state->rng, temp);
 
@@ -596,8 +609,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
             update_point(state, hi, xc2, v2);
             dhi = pv2;
         } else {
-            /* contract the whole simplex about the best point */
-
+            /* contract simplex about the best point */
             status = contract_by_best(state, lo, xc, f);
 
             if(status != GSL_SUCCESS) {
@@ -605,11 +617,12 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
             }
         }
     } else {
-        /* trial point is better than second highest point.  Replace
-         * highest point by it */
-
-		/* CHECK THIS!! Ought to be setting ds_hi and s_hi */
-
+        /*
+		 * Trial point is better than second highest point.  Insert it
+		 * into the simplex, replacing the current high point. No need
+		 * to reset dhi and ds_hi, because we are about to exit the
+		 * function.
+		 */
         update_point(state, hi, xc, v);
         dhi = pv;
     }
@@ -623,7 +636,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     {
         double      S2 = state->S2;
 
-        if(S2 > 0) {
+        if(S2 > 0.0) {
             *size = sqrt(S2);
         } else {
             /* recompute if accumulated error has made size invalid */
