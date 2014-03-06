@@ -160,7 +160,7 @@ main(void){
     gsl_multimin_fminimizer_set (s, &minex_func, x, ss);
     printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(s));
     printf ("%5s %10s %10s %7s %8s %8s %8s\n", "itr",
-            "x", "y", "f", "size", "MAE", "temp");
+            "x", "y", "f", "size", "AbsErr", "temp");
     do{
 		double temperature;
 		temperature = AnnealSched_next(sched);
@@ -178,15 +178,15 @@ main(void){
         size = gsl_multimin_fminimizer_size(s);
         status = gsl_multimin_test_size(size, tol);
 
-		/* mae is mean absolute error */
+		/* absErr is summed absolute error */
 		double errx = gsl_vector_get(s->x, 0) - par[0];
 		double erry = gsl_vector_get(s->x, 1) - par[1];
-		double mae = 0.5*(fabs(errx) + fabs(erry));
+		double absErr = fabs(errx) + fabs(erry);
         printf ("%5d %10.3e %10.3e %7.3f %8.3f %8.4f %8.4f\n", 
                 itr,
                 gsl_vector_get(s->x, 0), 
                 gsl_vector_get(s->x, 1), 
-                s->fval, size, mae, temperature);
+                s->fval, size, absErr, temperature);
     }while (status == GSL_CONTINUE && itr < maxItr);
     switch(status) {
     case GSL_SUCCESS:
