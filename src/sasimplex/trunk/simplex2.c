@@ -1,3 +1,4 @@
+
 /* multimin/simplex2.c
  * 
  * Copyright (C) 2007, 2008, 2009 Brian Gough
@@ -51,21 +52,20 @@ typedef struct {
     gsl_vector *center;         /* center of all points */
     gsl_vector *delta;          /* current step */
     gsl_vector *xmc;            /* x - center (workspace) */
-    double S2;
+    double      S2;
     unsigned long count;
 } nmsimplex_state_t;
 
 static int
-  compute_center(const nmsimplex_state_t * state, gsl_vector * center);
+ compute_center(const nmsimplex_state_t * state, gsl_vector * center);
 static double
-  compute_size(nmsimplex_state_t * state, const gsl_vector * center);
+compute_size(nmsimplex_state_t * state, const gsl_vector * center);
 
 static double
 try_corner_move(const double coeff,
                 const nmsimplex_state_t * state,
                 size_t corner,
-                gsl_vector * xc, const gsl_multimin_function * f)
-{
+                gsl_vector * xc, const gsl_multimin_function * f) {
     /* moves a simplex corner scaled by coeff (negative value represents 
      * mirroring by the middle point of the "other" corner points)
      * and gives new corner in xc and function value at xc as a 
@@ -73,13 +73,17 @@ try_corner_move(const double coeff,
      */
 
     gsl_matrix *x1 = state->x1;
+
     const size_t P = x1->size1;
-    double newval;
+
+    double      newval;
 
     /* xc = (1-coeff)*(P/(P-1)) * center(all) + ((P*coeff-1)/(P-1))*x_corner */
     {
-        double alpha = (1 - coeff) * P / (P - 1.0);
-        double beta = (P * coeff - 1.0) / (P - 1.0);
+        double      alpha = (1 - coeff) * P / (P - 1.0);
+
+        double      beta = (P * coeff - 1.0) / (P - 1.0);
+
         gsl_vector_const_view row = gsl_matrix_const_row(x1, corner);
 
         gsl_vector_memcpy(xc, state->center);
@@ -94,9 +98,9 @@ try_corner_move(const double coeff,
 
 static void
 update_point(nmsimplex_state_t * state, size_t i,
-             const gsl_vector * x, double val)
-{
+             const gsl_vector * x, double val) {
     gsl_vector_const_view x_orig = gsl_matrix_const_row(state->x1, i);
+
     const size_t P = state->x1->size1;
 
     /* Compute delta = x - x_orig */
@@ -109,8 +113,9 @@ update_point(nmsimplex_state_t * state, size_t i,
 
     /* Update size: S2' = S2 + (2/P) * (x_orig - c).delta + (P-1)*(delta/P)^2 */
     {
-        double d = gsl_blas_dnrm2(state->delta);
-        double xmcd;
+        double      d = gsl_blas_dnrm2(state->delta);
+
+        double      xmcd;
 
         gsl_blas_ddot(state->xmc, state->delta, &xmcd);
         state->S2 += (2.0 / P) * xmcd + ((P - 1.0) / P) * (d * d / P);
@@ -119,7 +124,7 @@ update_point(nmsimplex_state_t * state, size_t i,
     /* Update center:  c' = c + (x - x_orig) / P */
 
     {
-        double alpha = 1.0 / P;
+        double      alpha = 1.0 / P;
 
         gsl_blas_daxpy(-alpha, &x_orig.vector, state->center);
         gsl_blas_daxpy(alpha, x, state->center);
@@ -131,8 +136,7 @@ update_point(nmsimplex_state_t * state, size_t i,
 
 static int
 contract_by_best(nmsimplex_state_t * state, size_t best,
-                 gsl_vector * xc, gsl_multimin_function * f)
-{
+                 gsl_vector * xc, gsl_multimin_function * f) {
 
     /* Function contracts the simplex in respect to best valued
      * corner. That is, all corners besides the best corner are moved.
@@ -142,12 +146,14 @@ contract_by_best(nmsimplex_state_t * state, size_t best,
     /* the xc vector is simply work space here */
 
     gsl_matrix *x1 = state->x1;
+
     gsl_vector *y1 = state->y1;
 
-    size_t i, j;
-    double newval;
+    size_t      i, j;
 
-    int status = GSL_SUCCESS;
+    double      newval;
+
+    int         status = GSL_SUCCESS;
 
     for(i = 0; i < x1->size1; i++) {
         if(i != best) {
@@ -181,13 +187,14 @@ contract_by_best(nmsimplex_state_t * state, size_t best,
 }
 
 static int
-compute_center(const nmsimplex_state_t * state, gsl_vector * center)
-{
+compute_center(const nmsimplex_state_t * state, gsl_vector * center) {
     /* calculates the center of the simplex and stores in center */
 
     gsl_matrix *x1 = state->x1;
+
     const size_t P = x1->size1;
-    size_t i;
+
+    size_t      i;
 
     gsl_vector_set_zero(center);
 
@@ -207,8 +214,7 @@ compute_center(const nmsimplex_state_t * state, gsl_vector * center)
 }
 
 static double
-compute_size(nmsimplex_state_t * state, const gsl_vector * center)
-{
+compute_size(nmsimplex_state_t * state, const gsl_vector * center) {
     /* calculates simplex size as rms sum of length of vectors 
      * from simplex center to corner points:     
      * 
@@ -216,14 +222,17 @@ compute_size(nmsimplex_state_t * state, const gsl_vector * center)
      */
 
     gsl_vector *s = state->ws1;
-    gsl_matrix *x1 = state->x1;
-    const size_t P = x1->size1;
-    size_t i;
 
-    double ss = 0.0;
+    gsl_matrix *x1 = state->x1;
+
+    const size_t P = x1->size1;
+
+    size_t      i;
+
+    double      ss = 0.0;
 
     for(i = 0; i < P; i++) {
-        double t;
+        double      t;
 
         gsl_matrix_get_row(s, x1, i);
         gsl_blas_daxpy(-1.0, center, s);
@@ -237,9 +246,7 @@ compute_size(nmsimplex_state_t * state, const gsl_vector * center)
     return sqrt(ss / P);
 }
 
-static int
-nmsimplex_alloc(void *vstate, size_t n)
-{
+static int nmsimplex_alloc(void *vstate, size_t n) {
     nmsimplex_state_t *state = (nmsimplex_state_t *) vstate;
 
     if(n == 0) {
@@ -314,9 +321,7 @@ nmsimplex_alloc(void *vstate, size_t n)
     return GSL_SUCCESS;
 }
 
-static void
-nmsimplex_free(void *vstate)
-{
+static void nmsimplex_free(void *vstate) {
     nmsimplex_state_t *state = (nmsimplex_state_t *) vstate;
 
     gsl_matrix_free(state->x1);
@@ -331,11 +336,12 @@ nmsimplex_free(void *vstate)
 static int
 nmsimplex_set(void *vstate, gsl_multimin_function * f,
               const gsl_vector * x,
-              double *size, const gsl_vector * step_size)
-{
-    int status;
-    size_t i;
-    double val;
+              double *size, const gsl_vector * step_size) {
+    int         status;
+
+    size_t      i;
+
+    double      val;
 
     nmsimplex_state_t *state = (nmsimplex_state_t *) vstate;
 
@@ -370,8 +376,9 @@ nmsimplex_set(void *vstate, gsl_multimin_function * f,
         }
 
         {
-            double xi = gsl_vector_get(x, i);
-            double si = gsl_vector_get(step_size, i);
+            double      xi = gsl_vector_get(x, i);
+
+            double      si = gsl_vector_get(step_size, i);
 
             gsl_vector_set(xtemp, i, xi + si);
             val = GSL_MULTIMIN_FN_EVAL(f, xtemp);
@@ -407,16 +414,24 @@ nmsimplex_iterate(void *vstate, gsl_multimin_function * f,
     /* xc and xc2 vectors store tried corner point coordinates */
 
     gsl_vector *xc = state->ws1;
+
     gsl_vector *xc2 = state->ws2;
+
     gsl_vector *y1 = state->y1;
+
     gsl_matrix *x1 = state->x1;
 
     const size_t n = y1->size;
-    size_t i;
-    size_t hi, s_hi, lo;
-    double dhi, ds_hi, dlo;
-    int status;
-    double val, val2;
+
+    size_t      i;
+
+    size_t      hi, s_hi, lo;
+
+    double      dhi, ds_hi, dlo;
+
+    int         status;
+
+    double      val, val2;
 
     if(xc->size != x->size) {
         GSL_ERROR("incompatible size of x", GSL_EINVAL);
@@ -502,7 +517,7 @@ nmsimplex_iterate(void *vstate, gsl_multimin_function * f,
     /* Update simplex size */
 
     {
-        double S2 = state->S2;
+        double      S2 = state->S2;
 
         if(S2 > 0) {
             *size = sqrt(S2);
@@ -516,19 +531,17 @@ nmsimplex_iterate(void *vstate, gsl_multimin_function * f,
 }
 
 static const gsl_multimin_fminimizer_type nmsimplex_type = { "nmsimplex2",  /* name */
-    sizeof (nmsimplex_state_t),
+    sizeof(nmsimplex_state_t),
     &nmsimplex_alloc,
     &nmsimplex_set,
     &nmsimplex_iterate,
     &nmsimplex_free
 };
 
-const gsl_multimin_fminimizer_type
+const       gsl_multimin_fminimizer_type
     * gsl_multimin_fminimizer_nmsimplex2 = &nmsimplex_type;
 
-static inline double
-ran_unif(unsigned long *seed)
-{
+static inline double ran_unif(unsigned long *seed) {
     unsigned long s = *seed;
 
     *seed = (s * 69069 + 1) & 0xffffffffUL;
@@ -538,10 +551,10 @@ ran_unif(unsigned long *seed)
 static int
 nmsimplex_set_rand(void *vstate, gsl_multimin_function * f,
                    const gsl_vector * x,
-                   double *size, const gsl_vector * step_size)
-{
-    size_t i, j;
-    double val;
+                   double *size, const gsl_vector * step_size) {
+    size_t      i, j;
+
+    double      val;
 
     nmsimplex_state_t *state = (nmsimplex_state_t *) vstate;
 
@@ -579,7 +592,7 @@ nmsimplex_set_rand(void *vstate, gsl_multimin_function * f,
 
         /* start with random reflections */
         for(i = 0; i < x->size; i++) {
-            double s = ran_unif(&seed);
+            double      s = ran_unif(&seed);
 
             if(s > 0.5)
                 gsl_matrix_set(&m.matrix, i, i, -1.0);
@@ -589,9 +602,12 @@ nmsimplex_set_rand(void *vstate, gsl_multimin_function * f,
         for(i = 0; i < x->size; i++) {
             for(j = i + 1; j < x->size; j++) {
                 /* rotate columns i and j by a random angle */
-                double angle = 2.0 * M_PI * ran_unif(&seed);
-                double c = cos(angle), s = sin(angle);
+                double      angle = 2.0 * M_PI * ran_unif(&seed);
+
+                double      c = cos(angle), s = sin(angle);
+
                 gsl_vector_view c_i = gsl_matrix_column(&m.matrix, i);
+
                 gsl_vector_view c_j = gsl_matrix_column(&m.matrix, j);
 
                 gsl_blas_drot(&c_i.vector, &c_j.vector, c, s);
@@ -602,12 +618,14 @@ nmsimplex_set_rand(void *vstate, gsl_multimin_function * f,
          * each dimension, and use as an offset from the central point x */
 
         for(i = 0; i < x->size; i++) {
-            double x_i = gsl_vector_get(x, i);
-            double s_i = gsl_vector_get(step_size, i);
+            double      x_i = gsl_vector_get(x, i);
+
+            double      s_i = gsl_vector_get(step_size, i);
+
             gsl_vector_view c_i = gsl_matrix_column(&m.matrix, i);
 
             for(j = 0; j < x->size; j++) {
-                double x_ij = gsl_vector_get(&c_i.vector, j);
+                double      x_ij = gsl_vector_get(&c_i.vector, j);
 
                 gsl_vector_set(&c_i.vector, j, x_i + s_i * x_ij);
             }
@@ -640,12 +658,12 @@ nmsimplex_set_rand(void *vstate, gsl_multimin_function * f,
 }
 
 static const gsl_multimin_fminimizer_type nmsimplex2rand_type = { "nmsimplex2rand", /* name */
-    sizeof (nmsimplex_state_t),
+    sizeof(nmsimplex_state_t),
     &nmsimplex_alloc,
     &nmsimplex_set_rand,
     &nmsimplex_iterate,
     &nmsimplex_free
 };
 
-const gsl_multimin_fminimizer_type
+const       gsl_multimin_fminimizer_type
     * gsl_multimin_fminimizer_nmsimplex2rand = &nmsimplex2rand_type;
