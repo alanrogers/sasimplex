@@ -1,3 +1,4 @@
+
 /* multimin/sasimplex.c
  *
  * Copyright (C) 2014 Alan Rogers
@@ -70,7 +71,7 @@ typedef struct {
     double      S2;
     double      temperature;    /* increase to flatten surface */
     unsigned long count;
-    gsl_rng     *rng;           /* random number generator */
+    gsl_rng    *rng;            /* random number generator */
 } sasimplex_state_t;
 
 static int
@@ -82,24 +83,23 @@ compute_size(sasimplex_state_t * state, const gsl_vector * center);
  * Set seed of random number generator.
  */
 void
-sasimplex_seed_rng(gsl_multimin_fminimizer *minimizer, unsigned long seed) {
+sasimplex_seed_rng(gsl_multimin_fminimizer * minimizer, unsigned long seed) {
     sasimplex_state_t *state = (sasimplex_state_t *) minimizer->state;
 
-#if 0    
-	fprintf(stderr,
-			"%s:%d:%s: calling gsl_rng_set; state=%p state->rng=%p; seed=%lu\n",
-			__FILE__,__LINE__,__func__, state, state->rng, seed);
+#if 0
+    fprintf(stderr,
+            "%s:%d:%s: calling gsl_rng_set; state=%p state->rng=%p; seed=%lu\n",
+            __FILE__, __LINE__, __func__, state, state->rng, seed);
 #endif
-	if(state->rng == NULL) {
-		fprintf(stderr,"%s:%d: state->rng is NULL\n",
-				__FILE__,__LINE__);
-	}
-	gsl_rng_set(state->rng, seed);
+    if(state->rng == NULL) {
+        fprintf(stderr, "%s:%d: state->rng is NULL\n", __FILE__, __LINE__);
+    }
+    gsl_rng_set(state->rng, seed);
 }
 
 /** Set temperature. */
 void
-sasimplex_set_temp(gsl_multimin_fminimizer *minimizer, double temperature) {
+sasimplex_set_temp(gsl_multimin_fminimizer * minimizer, double temperature) {
     sasimplex_state_t *state = (sasimplex_state_t *) minimizer->state;
 
     state->temperature = temperature;
@@ -129,14 +129,16 @@ try_corner_move(const double coeff,
      * number of vertices in the simplex--n+1, where n is the
      * dimension of the state vector.
      */
-    const size_t P = x1->size1; 
+    const size_t P = x1->size1;
 
     double      newval;
 
     /* xc = (1-coeff)*(P/(P-1)) * center(all) + ((P*coeff-1)/(P-1))*x_corner */
     {
         double      alpha = (1 - coeff) * P / (P - 1.0);
+
         double      beta = (P * coeff - 1.0) / (P - 1.0);
+
         gsl_vector_const_view row = gsl_matrix_const_row(x1, corner);
 
         gsl_vector_memcpy(xc, state->center);
@@ -153,6 +155,7 @@ static void
 update_point(sasimplex_state_t * state, size_t i,
              const gsl_vector * x, double val) {
     gsl_vector_const_view x_orig = gsl_matrix_const_row(state->x1, i);
+
     const size_t P = state->x1->size1;
 
     /* Compute state->delta = x - x_orig */
@@ -166,6 +169,7 @@ update_point(sasimplex_state_t * state, size_t i,
     /* Update size: S2' = S2 + (2/P) * (x_orig - c).delta + (P-1)*(delta/P)^2 */
     {
         double      d = gsl_blas_dnrm2(state->delta);
+
         double      xmcd;
 
         /* increments state->S2 */
@@ -198,9 +202,11 @@ contract_by_best(sasimplex_state_t * state, size_t best,
     /* the xc vector is simply work space here */
 
     gsl_matrix *x1 = state->x1;
+
     gsl_vector *f1 = state->f1;
 
     size_t      i, j;
+
     double      newval;
 
     int         status = GSL_SUCCESS;
@@ -241,7 +247,9 @@ compute_center(const sasimplex_state_t * state, gsl_vector * center) {
     /* calculates the center of the simplex and stores in center */
 
     gsl_matrix *x1 = state->x1;
+
     const size_t P = x1->size1;
+
     size_t      i;
 
     gsl_vector_set_zero(center);
@@ -270,8 +278,11 @@ compute_size(sasimplex_state_t * state, const gsl_vector * center) {
      */
 
     gsl_vector *s = state->ws1;
+
     gsl_matrix *x1 = state->x1;
+
     const size_t P = x1->size1;
+
     size_t      i;
 
     double      ss = 0.0;
@@ -292,8 +303,8 @@ compute_size(sasimplex_state_t * state, const gsl_vector * center) {
 }
 
 static int sasimplex_alloc(void *vstate, size_t n) {
-#if 0    
-	fprintf(stderr,"%s:%d: enter %s\n",__FILE__,__LINE__,__func__);
+#if 0
+    fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
 #endif
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
 
@@ -367,41 +378,41 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     state->count = 0;
     state->temperature = 0.0;
 
-	/*
-	 * The line below allocates a random number generator and
-	 * initializes it with a default seed. It should be initialized
-	 * later with a call to
-	 *
-	 *    sasimplex_seed_rng(s, myseed);
-	 *
-	 * Otherwise, the random number generator will produce the same
-	 * sequence of numbers each time the program is run.
-	 */
+    /*
+     * The line below allocates a random number generator and
+     * initializes it with a default seed. It should be initialized
+     * later with a call to
+     *
+     *    sasimplex_seed_rng(s, myseed);
+     *
+     * Otherwise, the random number generator will produce the same
+     * sequence of numbers each time the program is run.
+     */
     state->rng = gsl_rng_alloc(gsl_rng_taus);
-	if(state->rng == NULL) {
+    if(state->rng == NULL) {
         gsl_matrix_free(state->x1);
         gsl_vector_free(state->f1);
         gsl_vector_free(state->ws1);
         gsl_vector_free(state->ws2);
         gsl_vector_free(state->center);
         gsl_vector_free(state->delta);
-		gsl_vector_free(state->xmc);
+        gsl_vector_free(state->xmc);
         GSL_ERROR("failed to allocate space for rng", GSL_ENOMEM);
-	}
+    }
+#if 0
+    fprintf(stderr,
+            "%s:%d:%s: after gsl_rng_alloc, state=%p state->rng=%p\n",
+            __FILE__, __LINE__, __func__, state, state->rng);
 
-#if 0    
-	fprintf(stderr,
-			"%s:%d:%s: after gsl_rng_alloc, state=%p state->rng=%p\n",
-			__FILE__,__LINE__,__func__, state, state->rng);
-
-	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
+    fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
+            __func__);
 #endif
     return GSL_SUCCESS;
 }
 
 static void sasimplex_free(void *vstate) {
-#if 0    
-	fprintf(stderr,"%s:%d: enter %s\n",__FILE__,__LINE__,__func__);
+#if 0
+    fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
 #endif
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
 
@@ -412,9 +423,10 @@ static void sasimplex_free(void *vstate) {
     gsl_vector_free(state->center);
     gsl_vector_free(state->delta);
     gsl_vector_free(state->xmc);
-	gsl_rng_free(state->rng);
-#if 0    
-	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
+    gsl_rng_free(state->rng);
+#if 0
+    fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
+            __func__);
 #endif
 }
 
@@ -422,11 +434,13 @@ static int
 sasimplex_set(void *vstate, gsl_multimin_function * f,
               const gsl_vector * x,
               double *size, const gsl_vector * step_size) {
-#if 0    
-	fprintf(stderr,"%s:%d: enter %s\n",__FILE__,__LINE__,__func__);
+#if 0
+    fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
 #endif
     int         status;
+
     size_t      i;
+
     double      val;
 
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
@@ -463,6 +477,7 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
 
         {
             double      xi = gsl_vector_get(x, i);
+
             double      si = gsl_vector_get(step_size, i);
 
             gsl_vector_set(xtemp, i, xi + si);
@@ -484,8 +499,9 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
 
     state->count++;
 
-#if 0    
-	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
+#if 0
+    fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
+            __func__);
 #endif
     return GSL_SUCCESS;
 }
@@ -494,8 +510,8 @@ static int
 sasimplex_iterate(void *vstate, gsl_multimin_function * f,
                   gsl_vector * x, double *size, double *fval) {
 
-#if 0    
-	fprintf(stderr,"%s:%d: enter %s\n",__FILE__,__LINE__,__func__);
+#if 0
+    fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
 #endif
     /* Simplex iteration tries to minimize function f value */
     /* Includes corrections from Ivo Alxneit <ivo.alxneit@psi.ch> */
@@ -503,17 +519,27 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 
     /* xc and xc2 vectors store tried corner point coordinates */
     gsl_vector *xc = state->ws1;
+
     gsl_vector *xc2 = state->ws2;
+
     gsl_vector *f1 = state->f1;
+
     gsl_matrix *x1 = state->x1;
 
     const size_t n = f1->size;
+
     size_t      i;
+
     size_t      hi, lo;
+
     double      dhi, ds_hi, dlo, hold;
+
     int         status;
-    double      v, v2;   /* unperturbed trial values */
-    double      pv, pv2; /* perturbed trial values */
+
+    double      v, v2;          /* unperturbed trial values */
+
+    double      pv, pv2;        /* perturbed trial values */
+
     double      temp = state->temperature;
 
     if(xc->size != x->size) {
@@ -521,28 +547,28 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     }
 
     /*
-	 * Find highest, second highest and lowest point. We need the
-	 * indices (lo and hi) of the  low and high points, but we don't
-	 * need the index of the second highest. We need the function
-	 * values of all three.
-	 *
-	 * dlo, ds_hi, and dhi are function values at these three points,
-	 * perturbed upward by random amounts. They are thus somewhat
-	 * worse than the true function values.
-	 */
-    lo=0;
-    hi=1;
+     * Find highest, second highest and lowest point. We need the
+     * indices (lo and hi) of the  low and high points, but we don't
+     * need the index of the second highest. We need the function
+     * values of all three.
+     *
+     * dlo, ds_hi, and dhi are function values at these three points,
+     * perturbed upward by random amounts. They are thus somewhat
+     * worse than the true function values.
+     */
+    lo = 0;
+    hi = 1;
     dlo = gsl_vector_get(f1, lo) + gsl_ran_exponential(state->rng, temp);
     dhi = gsl_vector_get(f1, hi) + gsl_ran_exponential(state->rng, temp);
 
-    if(dhi < dlo) {    /* swap lo and hi */
-        lo=1;
-        hi=0;
-		hold = lo;
+    if(dhi < dlo) {             /* swap lo and hi */
+        lo = 1;
+        hi = 0;
+        hold = lo;
         dlo = dhi;
         dhi = hold;
     }
-	ds_hi = dlo;
+    ds_hi = dlo;
 
     for(i = 2; i < n; i++) {
         v = gsl_vector_get(f1, i) + gsl_ran_exponential(state->rng, temp);
@@ -558,23 +584,22 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
         }
     }
 
-	/*
-	 * Try reflecting the highest value point.
-	 *
-	 * v is the true function value at the trial point and pv is the
-	 * perturbed version of that value. In contrast to the upward
-	 * perturbations in dlo, ds_hi, and dhi, the perturbation here is
-	 * downward, making the trial value a little better from the
-	 * perspective of the minimizer. This encourages the algorithm to
-	 * accept trial values--makes it eager to explore.
-	 */
+    /*
+     * Try reflecting the highest value point.
+     *
+     * v is the true function value at the trial point and pv is the
+     * perturbed version of that value. In contrast to the upward
+     * perturbations in dlo, ds_hi, and dhi, the perturbation here is
+     * downward, making the trial value a little better from the
+     * perspective of the minimizer. This encourages the algorithm to
+     * accept trial values--makes it eager to explore.
+     */
     v = try_corner_move(-1.0, state, hi, xc, f);
     pv = v - gsl_ran_exponential(state->rng, temp);
 
-
     if(gsl_finite(pv) && pv < dlo) {
         /*
-		 * Reflected point is lowest, try expansion.  In the Numerical
+         * Reflected point is lowest, try expansion.  In the Numerical
          * Recipes function amebsa, the analog of the the line below
          * is a call to amotsa, but has +2.0 rather than -2.0. What is
          * the difference?
@@ -618,11 +643,11 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
         }
     } else {
         /*
-		 * Trial point is better than second highest point.  Insert it
-		 * into the simplex, replacing the current high point. No need
-		 * to reset dhi and ds_hi, because we are about to exit the
-		 * function.
-		 */
+         * Trial point is better than second highest point.  Insert it
+         * into the simplex, replacing the current high point. No need
+         * to reset dhi and ds_hi, because we are about to exit the
+         * function.
+         */
         update_point(state, hi, xc, v);
         dhi = pv;
     }
@@ -644,14 +669,15 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
         }
     }
 
-#if 0    
-	fprintf(stderr,"%s:%d: returning from %s\n",__FILE__,__LINE__,__func__);
+#if 0
+    fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
+            __func__);
 #endif
     return GSL_SUCCESS;
 }
 
 static const gsl_multimin_fminimizer_type sasimplex_type = {
-	"sasimplex",   /* name */
+    "sasimplex",                /* name */
     sizeof(sasimplex_state_t),
     &sasimplex_alloc,
     &sasimplex_set,
@@ -667,6 +693,7 @@ sasimplex_set_rand(void *vstate, gsl_multimin_function * f,
                    const gsl_vector * x,
                    double *size, const gsl_vector * step_size) {
     size_t      i, j;
+
     double      val;
 
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
@@ -711,8 +738,11 @@ sasimplex_set_rand(void *vstate, gsl_multimin_function * f,
             for(j = i + 1; j < x->size; j++) {
                 /* rotate columns i and j by a random angle */
                 double      angle = 2.0 * M_PI * gsl_rng_uniform(state->rng);
+
                 double      c = cos(angle), s = sin(angle);
+
                 gsl_vector_view c_i = gsl_matrix_column(&m.matrix, i);
+
                 gsl_vector_view c_j = gsl_matrix_column(&m.matrix, j);
 
                 gsl_blas_drot(&c_i.vector, &c_j.vector, c, s);
@@ -724,7 +754,9 @@ sasimplex_set_rand(void *vstate, gsl_multimin_function * f,
 
         for(i = 0; i < x->size; i++) {
             double      x_i = gsl_vector_get(x, i);
+
             double      s_i = gsl_vector_get(step_size, i);
+
             gsl_vector_view c_i = gsl_matrix_column(&m.matrix, i);
 
             for(j = 0; j < x->size; j++) {
@@ -761,7 +793,7 @@ sasimplex_set_rand(void *vstate, gsl_multimin_function * f,
 }
 
 static const gsl_multimin_fminimizer_type sasimplexrand_type = {
-	"sasimplexrand",   /* name */
+    "sasimplexrand",            /* name */
     sizeof(sasimplex_state_t),
     &sasimplex_alloc,
     &sasimplex_set_rand,
