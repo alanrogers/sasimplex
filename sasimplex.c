@@ -1,4 +1,3 @@
-
 /* multimin/sasimplex.c
  *
  * Copyright (C) 2014 Alan Rogers
@@ -78,21 +77,6 @@ static int
  compute_center(const sasimplex_state_t * state, gsl_vector * center);
 static double
 compute_size(sasimplex_state_t * state, const gsl_vector * center);
-
-double
-SASimplex_bestFit(sasimplex_state_t *sas, double *x, int ndim)
-{
-    assert(ndim == sas->nparam);
-	int i;
-
-	size_t bestNdx = gsl_vector_min_index(sas->f1);
-	gsl_vector_const_view bestX = gsl_matrix_const_row(sas->x1, bestNdx);
-
-	for(i=0; i < &bestX.vector->size; ++i)
-		x[i] = gsl_vector_get(bestX, i);
-
-    return sas->f1[bestNdx];
-}
 
 /**
  * Set seed of random number generator.
@@ -534,17 +518,11 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 
     /* xc and xc2 vectors store tried corner point coordinates */
     gsl_vector *xc = state->ws1;
-
     gsl_vector *xc2 = state->ws2;
-
     gsl_vector *f1 = state->f1;
-
     gsl_matrix *x1 = state->x1;
-
     const size_t n = f1->size;
-
     size_t      i;
-
     size_t      hi, lo;
 
     double      dhi, ds_hi, dlo, hold;

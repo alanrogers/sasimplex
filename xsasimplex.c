@@ -190,9 +190,7 @@ int main(void) {
 
         /* absErr is summed absolute error */
         double      errx = gsl_vector_get(s->x, 0) - par[0];
-
         double      erry = gsl_vector_get(s->x, 1) - par[1];
-
         double      absErr = fabs(errx) + fabs(erry);
 
         printf("%5d %10.3e %10.3e %7.3f %8.3f %8.4f %8.4f\n",
