@@ -79,6 +79,21 @@ static int
 static double
 compute_size(sasimplex_state_t * state, const gsl_vector * center);
 
+double
+SASimplex_bestFit(sasimplex_state_t *sas, double *x, int ndim)
+{
+    assert(ndim == sas->nparam);
+	int i;
+
+	size_t bestNdx = gsl_vector_min_index(sas->f1);
+	gsl_vector_const_view bestX = gsl_matrix_const_row(sas->x1, bestNdx);
+
+	for(i=0; i < &bestX.vector->size; ++i)
+		x[i] = gsl_vector_get(bestX, i);
+
+    return sas->f1[bestNdx];
+}
+
 /**
  * Set seed of random number generator.
  */
