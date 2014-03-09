@@ -437,13 +437,9 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
     fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
 #endif
     int         status;
-
     size_t      i;
-
     double      val;
-
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
-
     gsl_vector *xtemp = state->ws1;
 
     if(xtemp->size != x->size) {
@@ -466,7 +462,6 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
     gsl_vector_set(state->f1, 0, val);
 
     /* following points are initialized to x0 + step_size */
-
     for(i = 0; i < x->size; i++) {
         status = gsl_vector_memcpy(xtemp, x);
 
@@ -476,7 +471,6 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
 
         {
             double      xi = gsl_vector_get(x, i);
-
             double      si = gsl_vector_get(step_size, i);
 
             gsl_vector_set(xtemp, i, xi + si);
@@ -524,15 +518,10 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     const size_t n = f1->size;
     size_t      i;
     size_t      hi, lo;
-
     double      dhi, ds_hi, dlo, hold;
-
     int         status;
-
     double      v, v2;          /* unperturbed trial values */
-
     double      pv, pv2;        /* perturbed trial values */
-
     double      temp = state->temperature;
 
     if(xc->size != x->size) {

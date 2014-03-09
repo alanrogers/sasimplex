@@ -20,7 +20,6 @@ struct AnnealSched {
 AnnealSched *AnnealSched_alloc(int nTemps, int nPerTemp,
                                double initTemp, double deflationFactor);
 double      AnnealSched_next(AnnealSched * s);
-
 double      my_f(const gsl_vector * v, void *params);
 
 /**
@@ -128,13 +127,9 @@ int main(void) {
         gsl_multimin_fminimizer_sasimplexrand;
 #endif
     gsl_vector *x = gsl_vector_alloc(stateDim);
-
     gsl_vector *ss = gsl_vector_alloc(stateDim);
-
     unsigned    i;
-
     int         status, itr = 0;
-
     double      size;
 
     /* Starting point */
