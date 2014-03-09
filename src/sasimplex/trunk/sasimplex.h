@@ -7,7 +7,7 @@
 GSL_VAR const gsl_multimin_fminimizer_type *gsl_multimin_fminimizer_sasimplex;
 
 GSL_VAR const gsl_multimin_fminimizer_type
-    *gsl_multimin_fminimizer_sasimplexrand;
+    * gsl_multimin_fminimizer_sasimplexrand;
 
 void        sasimplex_seed_rng(gsl_multimin_fminimizer * minimizer,
                                unsigned long seed);
