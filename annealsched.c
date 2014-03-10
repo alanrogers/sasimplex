@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include "annealsched.h"
 
-
 /**
  * This structure represents a schedule of annealing temperatures.
  */
