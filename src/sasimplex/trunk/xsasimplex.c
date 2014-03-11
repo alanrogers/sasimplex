@@ -2,7 +2,6 @@
 #include <math.h>
 #include <time.h>
 #include <gsl/gsl_multimin.h>
-#include <gsl/gsl_rng.h>
 #include "sasimplex.h"
 #include "annealsched.h"
 
@@ -80,15 +79,8 @@ int main(void) {
         fprintf(stderr, "%s:%d: bad allocation\n", __FILE__, __LINE__);
         exit(1);
     }
-    gsl_rng *rng = gsl_rng_alloc(gsl_rng_taus);
-    if(rng==NULL) {
-        fprintf(stderr,"%s:%d:%s: bad return from gsl_rng_alloc\n",
-                __FILE__,__LINE__,__func__);
-        exit(1);
-    }
     unsigned long seed = time(NULL);    /* get seed from clock */
-    gsl_rng_set(rng, seed);
-    sasimplex_set_rng(s, rng);
+    sasimplex_random_seed(s, seed);
     gsl_multimin_fminimizer_set(s, &minex_func, x, ss);
     printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(s));
     printf("%5s %10s %10s %7s %8s %8s %8s\n", "itr",
@@ -130,7 +122,6 @@ int main(void) {
     gsl_vector_free(x);
     gsl_vector_free(ss);
     gsl_multimin_fminimizer_free(s);
-    gsl_rng_free(rng);
 
     return status;
 }
