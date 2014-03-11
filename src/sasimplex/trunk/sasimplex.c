@@ -41,15 +41,16 @@
    This implementation uses n+1 corner points in the simplex.
 */
 
+#include "sasimplex.h"
 #include <stdio.h>
 #include <config.h>
 #include <stdlib.h>
+#include <assert.h>
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_multimin.h>
 #include <gsl/gsl_matrix_double.h>
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
-#include "sasimplex.h"
 
 /**
  * This structure contains the state of the minimizer.
@@ -70,31 +71,19 @@ typedef struct {
     double      S2;
     double      temperature;    /* increase to flatten surface */
     unsigned long count;
-    gsl_rng    *rng;            /* random number generator */
+
+    /*
+     * random number generator. Not locally owned, so not allocated by
+     * sasimplex_alloc or freed by sasimplex_free. To set up rng, use
+     * function sasimplex_set_rng.
+     */
+    gsl_rng    *rng;
 } sasimplex_state_t;
 
 static int
  compute_center(const sasimplex_state_t * state, gsl_vector * center);
 static double
 compute_size(sasimplex_state_t * state, const gsl_vector * center);
-
-/**
- * Set seed of random number generator.
- */
-void
-sasimplex_seed_rng(gsl_multimin_fminimizer * minimizer, unsigned long seed) {
-    sasimplex_state_t *state = (sasimplex_state_t *) minimizer->state;
-
-#if 0
-    fprintf(stderr,
-            "%s:%d:%s: calling gsl_rng_set; state=%p state->rng=%p; seed=%lu\n",
-            __FILE__, __LINE__, __func__, state, state->rng, seed);
-#endif
-    if(state->rng == NULL) {
-        fprintf(stderr, "%s:%d: state->rng is NULL\n", __FILE__, __LINE__);
-    }
-    gsl_rng_set(state->rng, seed);
-}
 
 /** Set temperature. */
 void
@@ -135,9 +124,7 @@ try_corner_move(const double coeff,
     /* xc = (1-coeff)*(P/(P-1)) * center(all) + ((P*coeff-1)/(P-1))*x_corner */
     {
         double      alpha = (1 - coeff) * P / (P - 1.0);
-
         double      beta = (P * coeff - 1.0) / (P - 1.0);
-
         gsl_vector_const_view row = gsl_matrix_const_row(x1, corner);
 
         gsl_vector_memcpy(xc, state->center);
@@ -154,7 +141,6 @@ static void
 update_point(sasimplex_state_t * state, size_t i,
              const gsl_vector * x, double val) {
     gsl_vector_const_view x_orig = gsl_matrix_const_row(state->x1, i);
-
     const size_t P = state->x1->size1;
 
     /* Compute state->delta = x - x_orig */
@@ -168,7 +154,6 @@ update_point(sasimplex_state_t * state, size_t i,
     /* Update size: S2' = S2 + (2/P) * (x_orig - c).delta + (P-1)*(delta/P)^2 */
     {
         double      d = gsl_blas_dnrm2(state->delta);
-
         double      xmcd;
 
         /* increments state->S2 */
@@ -201,13 +186,9 @@ contract_by_best(sasimplex_state_t * state, size_t best,
     /* the xc vector is simply work space here */
 
     gsl_matrix *x1 = state->x1;
-
     gsl_vector *f1 = state->f1;
-
     size_t      i, j;
-
     double      newval;
-
     int         status = GSL_SUCCESS;
 
     for(i = 0; i < x1->size1; i++) {
@@ -219,7 +200,6 @@ contract_by_best(sasimplex_state_t * state, size_t best,
             }
 
             /* evaluate function in the new point */
-
             gsl_matrix_get_row(xc, x1, i);
             newval = GSL_MULTIMIN_FN_EVAL(f, xc);
             gsl_vector_set(f1, i, newval);
@@ -227,7 +207,6 @@ contract_by_best(sasimplex_state_t * state, size_t best,
             /* notify caller that we found at least one bad function value.
              * we finish the contraction (and do not abort) to allow the user
              * to handle the situation */
-
             if(!gsl_finite(newval)) {
                 status = GSL_EBADFUNC;
             }
@@ -244,27 +223,20 @@ contract_by_best(sasimplex_state_t * state, size_t best,
 static int
 compute_center(const sasimplex_state_t * state, gsl_vector * center) {
     /* calculates the center of the simplex and stores in center */
-
     gsl_matrix *x1 = state->x1;
-
     const size_t P = x1->size1;
-
     size_t      i;
 
     gsl_vector_set_zero(center);
 
     for(i = 0; i < P; i++) {
         gsl_vector_const_view row = gsl_matrix_const_row(x1, i);
-
         gsl_blas_daxpy(1.0, &row.vector, center);
     }
-
     {
         const double alpha = 1.0 / P;
-
         gsl_blas_dscal(alpha, center);
     }
-
     return GSL_SUCCESS;
 }
 
@@ -275,20 +247,14 @@ compute_size(sasimplex_state_t * state, const gsl_vector * center) {
      * 
      * sqrt( sum ( || y - y_middlepoint ||^2 ) / n )
      */
-
     gsl_vector *s = state->ws1;
-
     gsl_matrix *x1 = state->x1;
-
     const size_t P = x1->size1;
-
     size_t      i;
-
     double      ss = 0.0;
 
     for(i = 0; i < P; i++) {
         double      t;
-
         gsl_matrix_get_row(s, x1, i);
         gsl_blas_daxpy(-1.0, center, s);
         t = gsl_blas_dnrm2(s);
@@ -301,6 +267,12 @@ compute_size(sasimplex_state_t * state, const gsl_vector * center) {
     return sqrt(ss / P);
 }
 
+/**
+ * Allocate arrays within an object of type sasimplex_state_t.
+ * The object itself must be allocated previously. This function
+ * does not allocate (or even touch) the rng (random number generator)
+ * field within the object.
+ */
 static int sasimplex_alloc(void *vstate, size_t n) {
 #if 0
     fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
@@ -333,7 +305,6 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     }
 
     state->ws2 = gsl_vector_alloc(n);
-
     if(state->ws2 == NULL) {
         gsl_matrix_free(state->x1);
         gsl_vector_free(state->f1);
@@ -342,7 +313,6 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     }
 
     state->center = gsl_vector_alloc(n);
-
     if(state->center == NULL) {
         gsl_matrix_free(state->x1);
         gsl_vector_free(state->f1);
@@ -352,7 +322,6 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     }
 
     state->delta = gsl_vector_alloc(n);
-
     if(state->delta == NULL) {
         gsl_matrix_free(state->x1);
         gsl_vector_free(state->f1);
@@ -363,7 +332,6 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     }
 
     state->xmc = gsl_vector_alloc(n);
-
     if(state->xmc == NULL) {
         gsl_matrix_free(state->x1);
         gsl_vector_free(state->f1);
@@ -377,32 +345,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     state->count = 0;
     state->temperature = 0.0;
 
-    /*
-     * The line below allocates a random number generator and
-     * initializes it with a default seed. It should be initialized
-     * later with a call to
-     *
-     *    sasimplex_seed_rng(s, myseed);
-     *
-     * Otherwise, the random number generator will produce the same
-     * sequence of numbers each time the program is run.
-     */
-    state->rng = gsl_rng_alloc(gsl_rng_taus);
-    if(state->rng == NULL) {
-        gsl_matrix_free(state->x1);
-        gsl_vector_free(state->f1);
-        gsl_vector_free(state->ws1);
-        gsl_vector_free(state->ws2);
-        gsl_vector_free(state->center);
-        gsl_vector_free(state->delta);
-        gsl_vector_free(state->xmc);
-        GSL_ERROR("failed to allocate space for rng", GSL_ENOMEM);
-    }
 #if 0
-    fprintf(stderr,
-            "%s:%d:%s: after gsl_rng_alloc, state=%p state->rng=%p\n",
-            __FILE__, __LINE__, __func__, state, state->rng);
-
     fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
             __func__);
 #endif
@@ -422,11 +365,22 @@ static void sasimplex_free(void *vstate) {
     gsl_vector_free(state->center);
     gsl_vector_free(state->delta);
     gsl_vector_free(state->xmc);
-    gsl_rng_free(state->rng);
 #if 0
     fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
             __func__);
 #endif
+}
+
+/**
+ * Provide pointer to random number generator. rng should be allocated,
+ * initialized, and freed by the calling function.
+ */
+void
+sasimplex_set_rng(gsl_multimin_fminimizer * minimizer, gsl_rng *rng) {
+    sasimplex_state_t *state = (sasimplex_state_t *) minimizer->state;
+
+    state->rng = rng;
+    assert(state->rng != NULL);
 }
 
 static int
@@ -451,9 +405,7 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
     }
 
     /* first point is the original x0 */
-
     val = GSL_MULTIMIN_FN_EVAL(f, x);
-
     if(!gsl_finite(val)) {
         GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
     }
@@ -464,11 +416,9 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
     /* following points are initialized to x0 + step_size */
     for(i = 0; i < x->size; i++) {
         status = gsl_vector_memcpy(xtemp, x);
-
         if(status != 0) {
             GSL_ERROR("vector memcopy failed", GSL_EFAILED);
         }
-
         {
             double      xi = gsl_vector_get(x, i);
             double      si = gsl_vector_get(step_size, i);
@@ -476,28 +426,25 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
             gsl_vector_set(xtemp, i, xi + si);
             val = GSL_MULTIMIN_FN_EVAL(f, xtemp);
         }
-
         if(!gsl_finite(val)) {
             GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
         }
-
         gsl_matrix_set_row(state->x1, i + 1, xtemp);
         gsl_vector_set(state->f1, i + 1, val);
     }
-
     compute_center(state, state->center);
 
     /* Initialize simplex size */
     *size = compute_size(state, state->center);
 
     state->count++;
-
 #if 0
     fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
             __func__);
 #endif
     return GSL_SUCCESS;
 }
+
 
 static int
 sasimplex_iterate(void *vstate, gsl_multimin_function * f,

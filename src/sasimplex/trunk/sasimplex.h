@@ -3,14 +3,15 @@
 
 #include <gsl/gsl_types.h>
 #include <gsl/gsl_multimin.h>
+#include <gsl/gsl_rng.h>
 
 GSL_VAR const gsl_multimin_fminimizer_type *gsl_multimin_fminimizer_sasimplex;
 
 GSL_VAR const gsl_multimin_fminimizer_type
     * gsl_multimin_fminimizer_sasimplexrand;
 
-void        sasimplex_seed_rng(gsl_multimin_fminimizer * minimizer,
-                               unsigned long seed);
+void        sasimplex_set_rng(gsl_multimin_fminimizer *minimizer,
+                              gsl_rng *rng);
 void        sasimplex_set_temp(gsl_multimin_fminimizer * minimizer,
                                double temperature);
 

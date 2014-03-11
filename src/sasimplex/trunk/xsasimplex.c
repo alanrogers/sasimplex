@@ -14,11 +14,8 @@ double      my_f(const gsl_vector * v, void *params);
  */
 double my_f(const gsl_vector * v, void *params) {
     double      x, y;
-
     double      fx, fy;         /* fractional parts of x and y */
-
     double      rval;
-
     double     *par = (double *) params;
 
     x = gsl_vector_get(v, 0) - par[0];
@@ -34,13 +31,9 @@ double my_f(const gsl_vector * v, void *params) {
 
 int main(void) {
     double      par[2] = { 3.0, 2.0 };  /* (x,y) at minumum */
-
     const size_t stateDim = 2; /**< dimension of state space */
-
     const double tol = 1e-4;
-
     const int   maxItr = 1000;
-
     double      initStepSize = 0.05;
 
     /* initial coordinates */
@@ -83,22 +76,25 @@ int main(void) {
     minex_func.params = par;
 
     gsl_multimin_fminimizer *s = gsl_multimin_fminimizer_alloc(T, stateDim);
-
     if(s == NULL) {
         fprintf(stderr, "%s:%d: bad allocation\n", __FILE__, __LINE__);
         exit(1);
     }
+    gsl_rng *rng = gsl_rng_alloc(gsl_rng_taus);
+    if(rng==NULL) {
+        fprintf(stderr,"%s:%d:%s: bad return from gsl_rng_alloc\n",
+                __FILE__,__LINE__,__func__);
+        exit(1);
+    }
     unsigned long seed = time(NULL);    /* get seed from clock */
-
-    sasimplex_seed_rng(s, seed);
+    gsl_rng_set(rng, seed);
+    sasimplex_set_rng(s, rng);
     gsl_multimin_fminimizer_set(s, &minex_func, x, ss);
     printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(s));
     printf("%5s %10s %10s %7s %8s %8s %8s\n", "itr",
            "x", "y", "f", "size", "AbsErr", "temp");
     do {
-        double      temperature;
-
-        temperature = AnnealSched_next(sched);
+        double temperature = AnnealSched_next(sched);
         sasimplex_set_temp(s, temperature);
         itr++;
         status = gsl_multimin_fminimizer_iterate(s);
@@ -134,6 +130,7 @@ int main(void) {
     gsl_vector_free(x);
     gsl_vector_free(ss);
     gsl_multimin_fminimizer_free(s);
+    gsl_rng_free(rng);
 
     return status;
 }
