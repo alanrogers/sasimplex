@@ -49,8 +49,6 @@
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_multimin.h>
 #include <gsl/gsl_matrix_double.h>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
 
 /**
  * This structure contains the state of the minimizer.
@@ -71,19 +69,15 @@ typedef struct {
     double      S2;
     double      temperature;    /* increase to flatten surface */
     unsigned long count;
-
-    /*
-     * random number generator. Not locally owned, so not allocated by
-     * sasimplex_alloc or freed by sasimplex_free. To set up rng, use
-     * function sasimplex_set_rng.
-     */
-    gsl_rng    *rng;
+    unsigned    seed;           /* for random number generator */
 } sasimplex_state_t;
 
 static int
  compute_center(const sasimplex_state_t * state, gsl_vector * center);
 static double
 compute_size(sasimplex_state_t * state, const gsl_vector * center);
+static inline double ran_uni(unsigned *seed);
+static inline double ran_exponential(unsigned *seed, double mean);
 
 /** Set temperature. */
 void
@@ -269,9 +263,7 @@ compute_size(sasimplex_state_t * state, const gsl_vector * center) {
 
 /**
  * Allocate arrays within an object of type sasimplex_state_t.
- * The object itself must be allocated previously. This function
- * does not allocate (or even touch) the rng (random number generator)
- * field within the object.
+ * The object itself must be allocated previously.
  */
 static int sasimplex_alloc(void *vstate, size_t n) {
 #if 0
@@ -344,6 +336,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
 
     state->count = 0;
     state->temperature = 0.0;
+    state->seed = 0;
 
 #if 0
     fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
@@ -371,16 +364,45 @@ static void sasimplex_free(void *vstate) {
 #endif
 }
 
+static inline double ran_uni(unsigned *seed) {
+    return rand_r(seed)/(RAND_MAX + 1.0);
+}
+
+static inline double ran_exponential(unsigned *seed, double mean) {
+    double u;
+    do{
+        u = rand_r(seed);
+    }while(u==0.0);
+    u /= RAND_MAX;        /* u is uniform on (0,1] */
+    return -mean * log(u);
+}
+
+
 /**
- * Provide pointer to random number generator. rng should be allocated,
- * initialized, and freed by the calling function.
+ * Provide pointer to random number generator.
  */
 void
-sasimplex_set_rng(gsl_multimin_fminimizer * minimizer, gsl_rng *rng) {
+sasimplex_random_seed(gsl_multimin_fminimizer * minimizer, unsigned seed) {
     sasimplex_state_t *state = (sasimplex_state_t *) minimizer->state;
 
-    state->rng = rng;
-    assert(state->rng != NULL);
+    state->seed = seed;
+}
+
+/*
+ * This won't work. state->x1 is a matrix, not a vector.
+ */
+void
+sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
+                          gsl_vector *lo, gsl_vector *hi) {
+    sasimplex_state_t *state = (sasimplex_state_t *) minimizer->state;
+    size_t i;
+
+    for(i=0; i < state->size; ++i) {
+        double x = gsl_vector_get(lo, i);
+        double y = gsl_vector_get(hi, i);
+        x += (y-x)*ran_unif(&state->seed);
+        gsl_vector_set(state->x1, i, x);
+    }
 }
 
 static int
@@ -487,8 +509,8 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
      */
     lo = 0;
     hi = 1;
-    dlo = gsl_vector_get(f1, lo) + gsl_ran_exponential(state->rng, temp);
-    dhi = gsl_vector_get(f1, hi) + gsl_ran_exponential(state->rng, temp);
+    dlo = gsl_vector_get(f1, lo) + ran_exponential(&state->seed, temp);
+    dhi = gsl_vector_get(f1, hi) + ran_exponential(&state->seed, temp);
 
     if(dhi < dlo) {             /* swap lo and hi */
         lo = 1;
@@ -500,7 +522,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     ds_hi = dlo;
 
     for(i = 2; i < n; i++) {
-        v = gsl_vector_get(f1, i) + gsl_ran_exponential(state->rng, temp);
+        v = gsl_vector_get(f1, i) + ran_exponential(&state->seed, temp);
         if(v < dlo) {
             dlo = v;
             lo = i;
@@ -524,7 +546,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
      * accept trial values--makes it eager to explore.
      */
     v = try_corner_move(-1.0, state, hi, xc, f);
-    pv = v - gsl_ran_exponential(state->rng, temp);
+    pv = v - ran_exponential(&state->seed, temp);
 
     if(gsl_finite(pv) && pv < dlo) {
         /*
@@ -534,7 +556,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
          * the difference?
          */
         v2 = try_corner_move(-2.0, state, hi, xc2, f);
-        pv2 = v2 - gsl_ran_exponential(state->rng, temp);
+        pv2 = v2 - ran_exponential(&state->seed, temp);
 
         if(gsl_finite(pv2) && pv2 < dlo) {
             update_point(state, hi, xc2, v2);
@@ -557,7 +579,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 
         /* try one-dimensional contraction */
         v2 = try_corner_move(0.5, state, hi, xc2, f);
-        pv2 = v2 - gsl_ran_exponential(state->rng, temp);
+        pv2 = v2 - ran_exponential(&state->seed, temp);
 
         if(gsl_finite(pv2) && pv2 <= dhi) {
             update_point(state, hi, xc2, v2);
@@ -656,9 +678,7 @@ sasimplex_set_rand(void *vstate, gsl_multimin_function * f,
 
         /* start with random reflections */
         for(i = 0; i < x->size; i++) {
-            double      s = gsl_rng_uniform_pos(state->rng);
-
-            if(s > 0.5)
+            if(0.5 < ran_uni(&state->seed) )
                 gsl_matrix_set(&m.matrix, i, i, -1.0);
         }
 
@@ -666,12 +686,9 @@ sasimplex_set_rand(void *vstate, gsl_multimin_function * f,
         for(i = 0; i < x->size; i++) {
             for(j = i + 1; j < x->size; j++) {
                 /* rotate columns i and j by a random angle */
-                double      angle = 2.0 * M_PI * gsl_rng_uniform(state->rng);
-
+                double      angle = 2.0 * M_PI * ran_uni(&state->seed);
                 double      c = cos(angle), s = sin(angle);
-
                 gsl_vector_view c_i = gsl_matrix_column(&m.matrix, i);
-
                 gsl_vector_view c_j = gsl_matrix_column(&m.matrix, j);
 
                 gsl_blas_drot(&c_i.vector, &c_j.vector, c, s);
