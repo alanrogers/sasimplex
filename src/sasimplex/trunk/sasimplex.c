@@ -82,7 +82,7 @@ static inline double ran_expn(unsigned *seed, double mean);
 /** Set temperature. */
 void
 sasimplex_set_temp(gsl_multimin_fminimizer * minimizer, double temperature) {
-    sasimplex_state_t *state = (sasimplex_state_t *) minimizer->state;
+    sasimplex_state_t *state = minimizer->state;
 
     state->temperature = temperature;
 }
@@ -389,7 +389,7 @@ static inline double ran_expn(unsigned *seed, double mean) {
  */
 void
 sasimplex_random_seed(gsl_multimin_fminimizer * minimizer, unsigned seed) {
-    sasimplex_state_t *state = (sasimplex_state_t *) minimizer->state;
+    sasimplex_state_t *state = minimizer->state;
 
     state->seed = seed;
 }
@@ -738,29 +738,40 @@ sasimplex_set_rand(void *vstate, gsl_multimin_function * f,
 int
 sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
                           gsl_vector *lo, gsl_vector *hi) { 
-    sasimplex_state_t *state = (sasimplex_state_t *) minimizer->state;
+    sasimplex_state_t *state = minimizer->state;
+    gsl_multimin_function *func = minimizer->f;
+    double val;
     size_t      i, j;
     gsl_vector *xtemp = state->ws1;
 
+    /*
+     * If lo and hi exist, then initialize around random point.
+     * Otherwise, initial point will be first row of existing
+     * matrix state->x1.
+     */
     if(lo!=NULL && hi!=NULL) {
-    }
-    if(xtemp->size != x->size) {
-        GSL_ERROR("incompatible size of x", GSL_EINVAL);
+        if(xtemp->size != lo->size) {
+            GSL_ERROR("incompatible size of lo", GSL_EINVAL);
+        }
+        if(xtemp->size != hi->size) {
+            GSL_ERROR("incompatible size of hi", GSL_EINVAL);
+        }
+        for(i=0; i < xtemp->size; ++i) {
+            double y = gsl_vector_get(lo, i);
+            double z = gsl_vector_get(hi, i);
+            assert(y <= z);
+            val = y + (z-y)*ran_uni(&state->seed);
+            gsl_vector_set(xtemp, i, val);
+        }
+        gsl_matrix_set_row(state->x1, 0, xtemp);
+        val = GSL_MULTIMIN_FN_EVAL(func, xtemp);
+        if(!gsl_finite(val)) {
+            GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
+        }
+        gsl_vector_set(state->f1, 0, val);
     }
 
-    if(xtemp->size != step_size->size) {
-        GSL_ERROR("incompatible size of step_size", GSL_EINVAL);
-    }
-
-    /* first point is the original x0 */
-    val = GSL_MULTIMIN_FN_EVAL(f, x);
-
-    if(!gsl_finite(val)) {
-        GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
-    }
-
-    gsl_matrix_set_row(state->x1, 0, x);
-    gsl_vector_set(state->f1, 0, val);
+XXXXXXXXXXXXXXXXXXXXXX stopped here
 
     {
         gsl_matrix_view m =
