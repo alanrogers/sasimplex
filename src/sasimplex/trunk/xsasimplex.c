@@ -28,18 +28,29 @@ double my_f(const gsl_vector * v, void *params) {
     return rval;
 }
 
+#define STATEDIM 2
+
+/*
+ * This API isn't clean, because sasimplex_randomize_state requires a
+ * pointer to the seed. Then sasimplex_random_seed requires the value
+ * of the seed. After the latter call, random number generation
+ * modifies a copy of this seed, which is stored within an object of
+ * type sasimplex_state_t. But the call to sasimplex_randomize_state
+ * modifies the local copy of the seed--in the calling program. Anyone
+ * trying to use this code is likely to get confused.
+ *
+ * Solution: make the random initial state a type of minimizer,
+ * analogous to gsl_multimin_fminimizer_sasimplexrand.
+ */
+
 int main(void) {
-    double      par[2] = { 3.0, 2.0 };  /* (x,y) at minumum */
-    const size_t stateDim = 2; /**< dimension of state space */
+    double      par[STATEDIM] = { 3.0, 2.0 };  /* (x,y) at minumum */
     const double tol = 1e-4;
     const int   maxItr = 1000;
     double      initStepSize = 0.05;
-
-    /* initial coordinates */
-    double      initVal[stateDim];
-
-    initVal[0] = 5.5;
-    initVal[1] = 7.5;
+    double      initVal[STATEDIM] = {5.5, 7.5};   /* initial coordinates */
+    const int   randomInitialPoint = 1;
+    unsigned long seed = time(NULL);    /* seed for random numbers */
 
 #if 0
     const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_sasimplex;
@@ -47,17 +58,12 @@ int main(void) {
     const gsl_multimin_fminimizer_type *T =
         gsl_multimin_fminimizer_sasimplexrand;
 #endif
-    gsl_vector *x = gsl_vector_alloc(stateDim);
-    gsl_vector *ss = gsl_vector_alloc(stateDim);
     unsigned    i;
     int         status, itr = 0;
     double      size;
 
-    /* Starting point */
-    for(i = 0; i < stateDim; ++i)
-        gsl_vector_set(x, i, initVal[i]);
-
     /* Set initial step sizes to initStepSize */
+    gsl_vector *ss = gsl_vector_alloc(STATEDIM);
     gsl_vector_set_all(ss, initStepSize);
 
     /* Set up annealing schedule */
@@ -67,21 +73,39 @@ int main(void) {
                                            0.5  /* ratio of adjacent temperatures */
         );
 
+    /* Starting point */
+    gsl_vector *x = gsl_vector_alloc(STATEDIM);
+    if(randomInitialPoint) {
+        gsl_vector *loInit = gsl_vector_alloc(STATEDIM);
+        gsl_vector *hiInit = gsl_vector_alloc(STATEDIM);
+        gsl_vector_set_all(loInit, -4.5);
+        gsl_vector_set_all(hiInit, 5.25);
+
+        sasimplex_randomize_state(x, loInit, hiInit, &seed);
+    }else{
+        for(i = 0; i < STATEDIM; ++i)
+            gsl_vector_set(x, i, initVal[i]);
+    }
+
     /* Initialize method and iterate */
     gsl_multimin_function minex_func;
 
-    minex_func.n = stateDim;
+    minex_func.n = STATEDIM;
     minex_func.f = my_f;
     minex_func.params = par;
 
-    gsl_multimin_fminimizer *s = gsl_multimin_fminimizer_alloc(T, stateDim);
+    gsl_multimin_fminimizer *s = gsl_multimin_fminimizer_alloc(T, STATEDIM);
     if(s == NULL) {
         fprintf(stderr, "%s:%d: bad allocation\n", __FILE__, __LINE__);
         exit(1);
     }
-    unsigned long seed = time(NULL);    /* get seed from clock */
-    sasimplex_random_seed(s, seed);
+
+    /*
+     * Bug: x is used here but is not set until later.
+     */
     gsl_multimin_fminimizer_set(s, &minex_func, x, ss);
+    sasimplex_random_seed(s, seed);
+
     printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(s));
     printf("%5s %10s %10s %7s %8s %8s %8s\n", "itr",
            "x", "y", "f", "size", "AbsErr", "temp");
