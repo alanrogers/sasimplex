@@ -3,8 +3,8 @@
 
 typedef struct AnnealSched AnnealSched;
 
-AnnealSched *AnnealSched_alloc(int nTemps, int nPerTemp,
-                               double initTemp, double deflationFactor);
+AnnealSched *AnnealSched_alloc(int nTmptrs, int nPerTmptr,
+                               double initTmptr, double deflationFactor);
 double      AnnealSched_next(AnnealSched * s);
 void        AnnealSched_free(AnnealSched * s);
 

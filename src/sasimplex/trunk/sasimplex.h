@@ -3,7 +3,6 @@
 
 #include <gsl/gsl_types.h>
 #include <gsl/gsl_multimin.h>
-#include <gsl/gsl_rng.h>
 
 GSL_VAR const gsl_multimin_fminimizer_type *gsl_multimin_fminimizer_sasimplex;
 

@@ -1,4 +1,3 @@
-#undef DEBUGGING
 /* multimin/sasimplex.c
  *
  * Copyright (C) 2014 Alan Rogers
@@ -50,12 +49,37 @@
 
 #include "sasimplex.h"
 #include <stdio.h>
+#include <math.h>
 #include <config.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <gsl/gsl_blas.h>
-#include <gsl/gsl_multimin.h>
 #include <gsl/gsl_matrix_double.h>
+
+typedef struct sasimplex_state_t sasimplex_state_t;
+
+static inline double ran_uni(unsigned *seed);
+static inline double ran_expn(unsigned *seed, double mean);
+static double try_corner_move(const double coeff,
+                              const sasimplex_state_t * state,
+                              size_t corner,
+                              gsl_vector * xc,
+                              const gsl_multimin_function * f);
+static void update_point(sasimplex_state_t * state, size_t i,
+                         const gsl_vector * x, double val);
+static int  contract_by_best(sasimplex_state_t * state, size_t best,
+                             gsl_vector * xc, gsl_multimin_function * f);
+static int  compute_center(const sasimplex_state_t * state,
+                           gsl_vector * center);
+static double compute_size(sasimplex_state_t * state,
+                           const gsl_vector * center);
+static int  sasimplex_alloc(void *vstate, size_t n);
+static void sasimplex_free(void *vstate);
+static int  sasimplex_set(void *vstate, gsl_multimin_function * f,
+                          const gsl_vector * x,
+                          double *size, const gsl_vector * step_size);
+static int  sasimplex_iterate(void *vstate, gsl_multimin_function * f,
+                              gsl_vector * x, double *size, double *fval);
 
 /**
  * This structure contains the state of the minimizer.
@@ -65,7 +89,7 @@
  * The field called "y1" in nmsimplex2 is called "f1" here to avoid
  * name conflict with the function "y1" in the C math library.
  */
-typedef struct {
+struct sasimplex_state_t {
     gsl_matrix *x1;             /* simplex corner points */
     gsl_vector *f1;             /* function value at corner points */
     gsl_vector *ws1;            /* workspace 1 for algorithm */
@@ -77,14 +101,19 @@ typedef struct {
     double      temperature;    /* increase to flatten surface */
     unsigned long count;
     unsigned    seed;           /* for random number generator */
-} sasimplex_state_t;
+};
 
-static int
- compute_center(const sasimplex_state_t * state, gsl_vector * center);
-static double
-compute_size(sasimplex_state_t * state, const gsl_vector * center);
-static inline double ran_uni(unsigned *seed);
-static inline double ran_expn(unsigned *seed, double mean);
+static const gsl_multimin_fminimizer_type sasimplex_type = {
+    "sasimplex",                /* name */
+    sizeof(sasimplex_state_t),
+    &sasimplex_alloc,
+    &sasimplex_set,
+    &sasimplex_iterate,
+    &sasimplex_free
+};
+
+const       gsl_multimin_fminimizer_type
+    * gsl_multimin_fminimizer_sasimplex = &sasimplex_type;
 
 /** Set temperature. */
 void
@@ -371,7 +400,7 @@ static void sasimplex_free(void *vstate) {
  * Random variates drawn from standard uniform distribution
  */
 static inline double ran_uni(unsigned *seed) {
-    return rand_r(seed)/(RAND_MAX + 1.0);
+    return rand_r(seed) / (RAND_MAX + 1.0);
 }
 
 /**
@@ -379,20 +408,16 @@ static inline double ran_uni(unsigned *seed) {
  * mean. 
  */
 static inline double ran_expn(unsigned *seed, double mean) {
-    double u;
-    do{
+    double      u;
+    do {
         u = rand_r(seed);
-    }while(u==0.0);
-    u /= RAND_MAX;        /* u is uniform on (0,1] */
+    } while(u == 0.0);
+    u /= RAND_MAX;              /* u is uniform on (0,1] */
     return -mean * log(u);
 }
 
-
-/**
- * Provide pointer to random number generator.
- */
-void
-sasimplex_random_seed(gsl_multimin_fminimizer * minimizer, unsigned seed) {
+/** Provide pointer to random number generator. */
+void sasimplex_random_seed(gsl_multimin_fminimizer * minimizer, unsigned seed) {
     sasimplex_state_t *state = minimizer->state;
 
     state->seed = seed;
@@ -459,7 +484,6 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
 #endif
     return GSL_SUCCESS;
 }
-
 
 static int
 sasimplex_iterate(void *vstate, gsl_multimin_function * f,
@@ -620,28 +644,16 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     return GSL_SUCCESS;
 }
 
-static const gsl_multimin_fminimizer_type sasimplex_type = {
-    "sasimplex",                /* name */
-    sizeof(sasimplex_state_t),
-    &sasimplex_alloc,
-    &sasimplex_set,
-    &sasimplex_iterate,
-    &sasimplex_free
-};
-
-const       gsl_multimin_fminimizer_type
-    * gsl_multimin_fminimizer_sasimplex = &sasimplex_type;
-
 int
 sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
-                          int rotate, gsl_vector *lo, gsl_vector *hi,
-                          const gsl_vector * step_size) { 
+                          int rotate, gsl_vector * lo, gsl_vector * hi,
+                          const gsl_vector * step_size) {
     sasimplex_state_t *state = minimizer->state;
     gsl_multimin_function *func = minimizer->f;
-    double val;
+    double      val;
     size_t      i, j;
     gsl_vector *xtemp = state->ws1;
-    size_t stateDim=xtemp->size;
+    size_t      stateDim = xtemp->size;
 
     /*
      * Copy of point 0 of the simplex into xtemp.
@@ -658,18 +670,18 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
      * Otherwise, initial point will be first row of existing
      * matrix state->x1.
      */
-    if(lo!=NULL && hi!=NULL) {
+    if(lo != NULL && hi != NULL) {
         if(stateDim != lo->size) {
             GSL_ERROR("incompatible size of lo", GSL_EINVAL);
         }
         if(stateDim != hi->size) {
             GSL_ERROR("incompatible size of hi", GSL_EINVAL);
         }
-        for(i=0; i < stateDim; ++i) {
-            double y = gsl_vector_get(lo, i);
-            double z = gsl_vector_get(hi, i);
+        for(i = 0; i < stateDim; ++i) {
+            double      y = gsl_vector_get(lo, i);
+            double      z = gsl_vector_get(hi, i);
             assert(y <= z);
-            val = y + (z-y)*ran_uni(&state->seed);
+            val = y + (z - y) * ran_uni(&state->seed);
             gsl_vector_set(xtemp, i, val);
         }
         gsl_matrix_set_row(state->x1, 0, xtemp);
@@ -688,7 +700,7 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
 
         /* start with random reflections */
         for(i = 0; i < stateDim; i++) {
-            if(0.5 < ran_uni(&state->seed) )
+            if(0.5 < ran_uni(&state->seed))
                 gsl_matrix_set(&m.matrix, i, i, -1.0);
         }
 
