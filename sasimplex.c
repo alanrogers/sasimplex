@@ -275,20 +275,17 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     }
 
     state->x1 = gsl_matrix_alloc(n + 1, n);
-
     if(state->x1 == NULL) {
         GSL_ERROR("failed to allocate space for x1", GSL_ENOMEM);
     }
 
     state->f1 = gsl_vector_alloc(n + 1);
-
     if(state->f1 == NULL) {
         gsl_matrix_free(state->x1);
         GSL_ERROR("failed to allocate space for y", GSL_ENOMEM);
     }
 
     state->ws1 = gsl_vector_alloc(n);
-
     if(state->ws1 == NULL) {
         gsl_matrix_free(state->x1);
         gsl_vector_free(state->f1);
@@ -392,27 +389,6 @@ sasimplex_random_seed(gsl_multimin_fminimizer * minimizer, unsigned seed) {
     sasimplex_state_t *state = minimizer->state;
 
     state->seed = seed;
-}
-
-/**
- * Set i'th entry of x to a value chosen at random from the uniform
- * distribution with range [lo[i], hi[i]].
- */
-void
-sasimplex_randomize_state(gsl_vector *x, gsl_vector *lo, gsl_vector *hi,
-                          unsigned *seedPtr) {
-    size_t i;
-
-    assert(x->size == lo->size);
-    assert(x->size == hi->size);
-
-    for(i=0; i < x->size; ++i) {
-        double val;
-        double y = gsl_vector_get(lo, i);
-        double z = gsl_vector_get(hi, i);
-        val = y + (z-y)*ran_uni(seedPtr);
-        gsl_vector_set(x, i, val);
-    }
 }
 
 static int
@@ -649,100 +625,26 @@ static const gsl_multimin_fminimizer_type sasimplex_type = {
 const       gsl_multimin_fminimizer_type
     * gsl_multimin_fminimizer_sasimplex = &sasimplex_type;
 
-static int
-sasimplex_set_rand(void *vstate, gsl_multimin_function * f,
-                   const gsl_vector * x,
-                   double *size, const gsl_vector * step_size) {
-    size_t      i, j;
-    double      val;
-    sasimplex_state_t *state = (sasimplex_state_t *) vstate;
-    gsl_vector *xtemp = state->ws1;
-
-    if(xtemp->size != x->size) {
-        GSL_ERROR("incompatible size of x", GSL_EINVAL);
-    }
-
-    if(xtemp->size != step_size->size) {
-        GSL_ERROR("incompatible size of step_size", GSL_EINVAL);
-    }
-
-    /* first point is the original x0 */
-    val = GSL_MULTIMIN_FN_EVAL(f, x);
-
-    if(!gsl_finite(val)) {
-        GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
-    }
-
-    gsl_matrix_set_row(state->x1, 0, x);
-    gsl_vector_set(state->f1, 0, val);
-
-    {
-        gsl_matrix_view m =
-            gsl_matrix_submatrix(state->x1, 1, 0, x->size, x->size);
-
-        gsl_matrix_set_identity(&m.matrix);
-
-        /* start with random reflections */
-        for(i = 0; i < x->size; i++) {
-            if(0.5 < ran_uni(&state->seed) )
-                gsl_matrix_set(&m.matrix, i, i, -1.0);
-        }
-
-        /* apply random rotations */
-        for(i = 0; i < x->size; i++) {
-            for(j = i + 1; j < x->size; j++) {
-                /* rotate columns i and j by a random angle */
-                double      angle = 2.0 * M_PI * ran_uni(&state->seed);
-                double      c = cos(angle), s = sin(angle);
-                gsl_vector_view c_i = gsl_matrix_column(&m.matrix, i);
-                gsl_vector_view c_j = gsl_matrix_column(&m.matrix, j);
-
-                gsl_blas_drot(&c_i.vector, &c_j.vector, c, s);
-            }
-        }
-
-        /* scale the orthonormal basis by the user-supplied step_size in
-         * each dimension, and use as an offset from the central point x */
-        for(i = 0; i < x->size; i++) {
-            double      x_i = gsl_vector_get(x, i);
-            double      s_i = gsl_vector_get(step_size, i);
-            gsl_vector_view c_i = gsl_matrix_column(&m.matrix, i);
-
-            for(j = 0; j < x->size; j++) {
-                double      x_ij = gsl_vector_get(&c_i.vector, j);
-                gsl_vector_set(&c_i.vector, j, x_i + s_i * x_ij);
-            }
-        }
-
-        /* compute the function values at each offset point */
-        for(i = 0; i < x->size; i++) {
-            gsl_vector_view r_i = gsl_matrix_row(&m.matrix, i);
-            val = GSL_MULTIMIN_FN_EVAL(f, &r_i.vector);
-            if(!gsl_finite(val)) {
-                GSL_ERROR("non-finite function value encountered",
-                          GSL_EBADFUNC);
-            }
-            gsl_vector_set(state->f1, i + 1, val);
-        }
-    }
-
-    compute_center(state, state->center);
-
-    /* Initialize simplex size */
-    *size = compute_size(state, state->center);
-
-    state->count++;
-    return GSL_SUCCESS;
-}
-
 int
 sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
-                          gsl_vector *lo, gsl_vector *hi) { 
+                          int rotate, gsl_vector *lo, gsl_vector *hi,
+                          const gsl_vector * step_size) { 
     sasimplex_state_t *state = minimizer->state;
     gsl_multimin_function *func = minimizer->f;
     double val;
     size_t      i, j;
     gsl_vector *xtemp = state->ws1;
+    size_t stateDim=xtemp->size;
+
+    /*
+     * Copy of point 0 of the simplex into xtemp.
+     *
+     * It's not clear this is necessary. Current code copies row 0 into
+     * xtemp, manipulates xtemp, then copies back into row 0. Perhaps
+     * I could get away with working directly on pt0.
+     */
+    gsl_vector_const_view row0 = gsl_matrix_const_row(state->x1, 0);
+    gsl_vector_memcpy(xtemp, &row0.vector);
 
     /*
      * If lo and hi exist, then initialize around random point.
@@ -750,13 +652,13 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
      * matrix state->x1.
      */
     if(lo!=NULL && hi!=NULL) {
-        if(xtemp->size != lo->size) {
+        if(stateDim != lo->size) {
             GSL_ERROR("incompatible size of lo", GSL_EINVAL);
         }
-        if(xtemp->size != hi->size) {
+        if(stateDim != hi->size) {
             GSL_ERROR("incompatible size of hi", GSL_EINVAL);
         }
-        for(i=0; i < xtemp->size; ++i) {
+        for(i=0; i < stateDim; ++i) {
             double y = gsl_vector_get(lo, i);
             double z = gsl_vector_get(hi, i);
             assert(y <= z);
@@ -771,23 +673,21 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
         gsl_vector_set(state->f1, 0, val);
     }
 
-XXXXXXXXXXXXXXXXXXXXXX stopped here
-
-    {
+    if(rotate) {
         gsl_matrix_view m =
-            gsl_matrix_submatrix(state->x1, 1, 0, x->size, x->size);
+            gsl_matrix_submatrix(state->x1, 1, 0, stateDim, stateDim);
 
         gsl_matrix_set_identity(&m.matrix);
 
         /* start with random reflections */
-        for(i = 0; i < x->size; i++) {
+        for(i = 0; i < stateDim; i++) {
             if(0.5 < ran_uni(&state->seed) )
                 gsl_matrix_set(&m.matrix, i, i, -1.0);
         }
 
         /* apply random rotations */
-        for(i = 0; i < x->size; i++) {
-            for(j = i + 1; j < x->size; j++) {
+        for(i = 0; i < stateDim; i++) {
+            for(j = i + 1; j < stateDim; j++) {
                 /* rotate columns i and j by a random angle */
                 double      angle = 2.0 * M_PI * ran_uni(&state->seed);
                 double      c = cos(angle), s = sin(angle);
@@ -800,21 +700,21 @@ XXXXXXXXXXXXXXXXXXXXXX stopped here
 
         /* scale the orthonormal basis by the user-supplied step_size in
          * each dimension, and use as an offset from the central point x */
-        for(i = 0; i < x->size; i++) {
-            double      x_i = gsl_vector_get(x, i);
+        for(i = 0; i < stateDim; i++) {
+            double      x_i = gsl_vector_get(&row0.vector, i);
             double      s_i = gsl_vector_get(step_size, i);
             gsl_vector_view c_i = gsl_matrix_column(&m.matrix, i);
 
-            for(j = 0; j < x->size; j++) {
+            for(j = 0; j < stateDim; j++) {
                 double      x_ij = gsl_vector_get(&c_i.vector, j);
                 gsl_vector_set(&c_i.vector, j, x_i + s_i * x_ij);
             }
         }
 
         /* compute the function values at each offset point */
-        for(i = 0; i < x->size; i++) {
+        for(i = 0; i < stateDim; i++) {
             gsl_vector_view r_i = gsl_matrix_row(&m.matrix, i);
-            val = GSL_MULTIMIN_FN_EVAL(f, &r_i.vector);
+            val = GSL_MULTIMIN_FN_EVAL(minimizer->f, &r_i.vector);
             if(!gsl_finite(val)) {
                 GSL_ERROR("non-finite function value encountered",
                           GSL_EBADFUNC);
@@ -825,21 +725,9 @@ XXXXXXXXXXXXXXXXXXXXXX stopped here
 
     compute_center(state, state->center);
 
-    /* Initialize simplex size */
-    *size = compute_size(state, state->center);
+    /* reset simplex size */
+    minimizer->size = compute_size(state, state->center);
 
     state->count++;
     return GSL_SUCCESS;
 }
-
-static const gsl_multimin_fminimizer_type sasimplexrand_type = {
-    "sasimplexrand",            /* name */
-    sizeof(sasimplex_state_t),
-    &sasimplex_alloc,
-    &sasimplex_set_rand,
-    &sasimplex_iterate,
-    &sasimplex_free
-};
-
-const       gsl_multimin_fminimizer_type
-    * gsl_multimin_fminimizer_sasimplexrand = &sasimplexrand_type;

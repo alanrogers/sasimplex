@@ -7,14 +7,12 @@
 
 GSL_VAR const gsl_multimin_fminimizer_type *gsl_multimin_fminimizer_sasimplex;
 
-GSL_VAR const gsl_multimin_fminimizer_type
-    * gsl_multimin_fminimizer_sasimplexrand;
-
 void        sasimplex_random_seed(gsl_multimin_fminimizer * minimizer,
                                   unsigned seed);
 void        sasimplex_set_temp(gsl_multimin_fminimizer * minimizer,
                                double temperature);
-void        sasimplex_randomize_state(gsl_vector *x, gsl_vector *lo,
-                                      gsl_vector *hi, unsigned *seedPtr);
-
+int         sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer, 
+                                      int rotate, gsl_vector *lo,
+                                      gsl_vector *hi,
+                                      const gsl_vector * step_size);
 #endif                       /* __GSL_SASIMPLEX_H__ */
