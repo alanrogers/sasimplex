@@ -17,30 +17,36 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA. 
  */
 
 /*
-   - Originally written by Tuomo Keskitalo <tuomo.keskitalo@iki.fi>
-   - Corrections to nmsimplex_iterate and other functions 
-     by Ivo Alxneit <ivo.alxneit@psi.ch>
-   - Additional help by Brian Gough <bjg@network-theory.co.uk>
-   - Optimisations added by Brian Gough <bjg@network-theory.co.uk>
-         + use BLAS for frequently-called functions
-         + keep track of the center to avoid unnecessary computation
-         + compute size as RMS value, allowing linear update on each step
-           instead of recomputing from all N+1 vectors.
-   - This code is based on simplex2.c from version 1.16 of the Gnu
-     Scientific Library. Modified here by Alan Rogers to implemented
-     Simplex Simulated Annealing, as described by Press et al.
-*/
-
-/* The Simplex method of Nelder and Mead, also known as the polytope
-   search alogorithm.  Ref: Nelder, J.A., Mead, R., Computer Journal 7
-   (1965) pp. 308-313.
-
-   This implementation uses n+1 corner points in the simplex.
-*/
+ * 2014-03-12: sasimplex.c and sasimplex.h implement Simplex Simulated
+ *             Annealing, as described in Numerical Recipes, by Press
+ *             et al. This implementation does not use code from
+ *             Numerical Recipes. It is based on simplex2.c in
+ *             version 1.16 of the Gnu Scientific Library.
+ *             Alan R. Rogers <rogers@anthro.utah.edu>
+ *
+ ******************************************************************
+ * Documentation from simplex2.c:
+ * - Originally written by Tuomo Keskitalo <tuomo.keskitalo@iki.fi>
+ * - Corrections to nmsimplex_iterate and other functions 
+ *   by Ivo Alxneit <ivo.alxneit@psi.ch>
+ * - Additional help by Brian Gough <bjg@network-theory.co.uk>
+ * - Optimisations added by Brian Gough <bjg@network-theory.co.uk>
+ *       + use BLAS for frequently-called functions
+ *       + keep track of the center to avoid unnecessary computation
+ *       + compute size as RMS value, allowing linear update on each step
+ *         instead of recomputing from all N+1 vectors.
+ *
+ * The Simplex method of Nelder and Mead, also known as the polytope
+ * search alogorithm.  Ref: Nelder, J.A., Mead, R., Computer Journal 7
+ *  (1965) pp. 308-313.
+ *
+ * This implementation uses n+1 corner points in the simplex.
+ */
 
 #include "sasimplex.h"
 #include <stdio.h>
