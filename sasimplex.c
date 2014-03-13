@@ -1,3 +1,4 @@
+#undef DEBUGGING
 /* multimin/sasimplex.c
  *
  * Copyright (C) 2014 Alan Rogers
@@ -265,7 +266,7 @@ compute_size(sasimplex_state_t * state, const gsl_vector * center) {
  * The object itself must be allocated previously.
  */
 static int sasimplex_alloc(void *vstate, size_t n) {
-#if 0
+#ifdef DEBUGGING
     fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
 #endif
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
@@ -334,7 +335,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     state->temperature = 0.0;
     state->seed = 0;
 
-#if 0
+#ifdef DEBUGGING
     fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
             __func__);
 #endif
@@ -342,7 +343,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
 }
 
 static void sasimplex_free(void *vstate) {
-#if 0
+#ifdef DEBUGGING
     fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
 #endif
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
@@ -354,7 +355,7 @@ static void sasimplex_free(void *vstate) {
     gsl_vector_free(state->center);
     gsl_vector_free(state->delta);
     gsl_vector_free(state->xmc);
-#if 0
+#ifdef DEBUGGING
     fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
             __func__);
 #endif
@@ -395,7 +396,7 @@ static int
 sasimplex_set(void *vstate, gsl_multimin_function * f,
               const gsl_vector * x,
               double *size, const gsl_vector * step_size) {
-#if 0
+#ifdef DEBUGGING
     fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
 #endif
     int         status;
@@ -446,7 +447,7 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
     *size = compute_size(state, state->center);
 
     state->count++;
-#if 0
+#ifdef DEBUGGING
     fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
             __func__);
 #endif
@@ -458,7 +459,7 @@ static int
 sasimplex_iterate(void *vstate, gsl_multimin_function * f,
                   gsl_vector * x, double *size, double *fval) {
 
-#if 0
+#ifdef DEBUGGING
     fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
 #endif
     /* Simplex iteration tries to minimize function f value */
@@ -606,7 +607,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
         }
     }
 
-#if 0
+#ifdef DEBUGGING
     fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
             __func__);
 #endif
