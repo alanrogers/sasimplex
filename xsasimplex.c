@@ -56,13 +56,15 @@ int main(void) {
                                            0.5  /* ratio of adjacent temps */
         );
 
-    /* Starting point */
+    /* Initial state vector */
     double      initVal[STATEDIM] = {5.5, 7.5};
     gsl_vector *x = gsl_vector_alloc(STATEDIM);
-	gsl_vector *loInit = gsl_vector_alloc(STATEDIM);
-	gsl_vector *hiInit = gsl_vector_alloc(STATEDIM);
     for(i = 0; i < STATEDIM; ++i)
         gsl_vector_set(x, i, initVal[i]);
+
+	/* for random restarts */
+	gsl_vector *loInit = gsl_vector_alloc(STATEDIM);
+	gsl_vector *hiInit = gsl_vector_alloc(STATEDIM);
 	gsl_vector_set_all(loInit, -4.5);
 	gsl_vector_set_all(hiInit, 4.5);
 
@@ -86,9 +88,10 @@ int main(void) {
     printf("%3s %5s %10s %10s %7s %8s %8s %8s\n", "try", "itr",
            "x", "y", "f", "size", "AbsErr", "temp");
 	for(try=0; try < nTries; ++try) {
-        sasimplex_randomize_state(s, rotate, loInit, hiInit, ss);
 		AnnealSched_reset(sched);
 		itr = 0;
+		if(try > 0)
+			sasimplex_randomize_state(s, rotate, loInit, hiInit, ss);
 		printf("%3d %5d %10.3e %10.3e\n",
 			   try, itr,
 			   gsl_vector_get(s->x, 0),
