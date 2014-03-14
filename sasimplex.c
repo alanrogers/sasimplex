@@ -56,6 +56,16 @@
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_matrix_double.h>
 
+/* Abort if random number seed is not yet set */
+#ifndef NDEBUG
+#  define ASSERT_SEED_SET(s) do{ if(!((s)->seedSet)) { \
+	fprintf(stderr, "\nERR@%s:%d: call sasimplex_random_seed before %s\n",\
+			__FILE__, __LINE__, __func__);\
+	exit(GSL_EINVAL); } }while(0)
+#else
+#  define ASSERT_SEED_SET(s) 
+#endif    
+
 typedef struct sasimplex_state_t sasimplex_state_t;
 
 static inline double ran_uni(unsigned *seed);
@@ -100,6 +110,7 @@ struct sasimplex_state_t {
     double      S2;
     double      temperature;    /* increase to flatten surface */
     unsigned long count;
+	unsigned    seedSet;        /* 0 initially; 1 after seed is set */
     unsigned    seed;           /* for random number generator */
 };
 
@@ -368,7 +379,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
 
     state->count = 0;
     state->temperature = 0.0;
-    state->seed = 0;
+    state->seedSet = state->seed = 0;
 
 #ifdef DEBUGGING
     fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
@@ -416,11 +427,12 @@ static inline double ran_expn(unsigned *seed, double mean) {
     return -mean * log(u);
 }
 
-/** Provide pointer to random number generator. */
+/** Provide seed for random number generator. */
 void sasimplex_random_seed(gsl_multimin_fminimizer * minimizer, unsigned seed) {
     sasimplex_state_t *state = minimizer->state;
 
     state->seed = seed;
+	state->seedSet = 1;
 }
 
 static int
@@ -526,6 +538,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
      */
     lo = 0;
     hi = 1;
+	ASSERT_SEED_SET(state);
     dlo = gsl_vector_get(f1, lo) + ran_expn(&state->seed, temp);
     dhi = gsl_vector_get(f1, hi) + ran_expn(&state->seed, temp);
 
@@ -655,6 +668,7 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
     gsl_vector *xtemp = state->ws1;
     size_t      stateDim = xtemp->size;
 
+	ASSERT_SEED_SET(state);
     /*
      * Copy of point 0 of the simplex into xtemp.
      *
@@ -685,6 +699,7 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
             gsl_vector_set(xtemp, i, val);
         }
         gsl_matrix_set_row(state->x1, 0, xtemp);
+		gsl_vector_memcpy(minimizer->x, xtemp);
         val = GSL_MULTIMIN_FN_EVAL(func, xtemp);
         if(!gsl_finite(val)) {
             GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
