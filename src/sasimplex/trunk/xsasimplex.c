@@ -35,14 +35,15 @@ int main(void) {
     const double tol = 1e-4;
     const int   maxItr = 1000;
     double      initStepSize = 0.05;
-    const int   randomInitialPoint = 1; /* start at a random point? */
     const int   rotate = 1;             /* random rotation of init simplex?*/
+	const int   verbose = 0;	
     unsigned long seed = time(NULL);    /* for random numbers */
+	unsigned    nTries = 10;            /* number of random starts */
 
     const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_sasimplex;
-    unsigned    i;
+    unsigned    i, try;
     int         status, itr = 0;
-    double      size;
+    double      size, absErr, temperature;
 
     /* Set initial step sizes to initStepSize */
     gsl_vector *ss = gsl_vector_alloc(STATEDIM);
@@ -56,10 +57,14 @@ int main(void) {
         );
 
     /* Starting point */
-    gsl_vector *x = gsl_vector_alloc(STATEDIM);
     double      initVal[STATEDIM] = {5.5, 7.5};
+    gsl_vector *x = gsl_vector_alloc(STATEDIM);
+	gsl_vector *loInit = gsl_vector_alloc(STATEDIM);
+	gsl_vector *hiInit = gsl_vector_alloc(STATEDIM);
     for(i = 0; i < STATEDIM; ++i)
         gsl_vector_set(x, i, initVal[i]);
+	gsl_vector_set_all(loInit, -4.5);
+	gsl_vector_set_all(hiInit, 4.5);
 
     /* Initialize method and iterate */
     gsl_multimin_function minex_func;
@@ -76,52 +81,61 @@ int main(void) {
 
     gsl_multimin_fminimizer_set(s, &minex_func, x, ss);
     sasimplex_random_seed(s, seed);
-    if(randomInitialPoint) {
-        gsl_vector *loInit = gsl_vector_alloc(STATEDIM);
-        gsl_vector *hiInit = gsl_vector_alloc(STATEDIM);
-        gsl_vector_set_all(loInit, -4.5);
-        gsl_vector_set_all(hiInit, 4.5);
-
-        sasimplex_randomize_state(s, rotate, loInit, hiInit, ss);
-    }
 
     printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(s));
-    printf("%5s %10s %10s %7s %8s %8s %8s\n", "itr",
+    printf("%3s %5s %10s %10s %7s %8s %8s %8s\n", "try", "itr",
            "x", "y", "f", "size", "AbsErr", "temp");
-    do {
-        double temperature = AnnealSched_next(sched);
-        sasimplex_set_temp(s, temperature);
-        itr++;
-        status = gsl_multimin_fminimizer_iterate(s);
-        if(status) {
-            printf("%s:%d:%s: rtn val %d from %s\n",
-                   __FILE__, __LINE__, __func__,
-                   status, "gsl_multimin_fminimizer_iterate");
-            break;
-        }
+	for(try=0; try < nTries; ++try) {
+        sasimplex_randomize_state(s, rotate, loInit, hiInit, ss);
+		AnnealSched_reset(sched);
+		itr = 0;
+		printf("%3d %5d %10.3e %10.3e\n",
+			   try, itr,
+			   gsl_vector_get(s->x, 0),
+			   gsl_vector_get(s->x, 1));
+		do {
+			temperature = AnnealSched_next(sched);
+			sasimplex_set_temp(s, temperature);
+			status = gsl_multimin_fminimizer_iterate(s);
+			if(status) {
+				printf("%s:%d:%s: rtn val %d from %s\n",
+					   __FILE__, __LINE__, __func__,
+					   status, "gsl_multimin_fminimizer_iterate");
+				break;
+			}
 
-        size = gsl_multimin_fminimizer_size(s);
-        status = gsl_multimin_test_size(size, tol);
+			size = gsl_multimin_fminimizer_size(s);
+			status = gsl_multimin_test_size(size, tol);
 
-        /* absErr is summed absolute error */
-        double      errx = gsl_vector_get(s->x, 0) - par[0];
-        double      erry = gsl_vector_get(s->x, 1) - par[1];
-        double      absErr = fabs(errx) + fabs(erry);
+			/* absErr is summed absolute error */
+			double      errx = gsl_vector_get(s->x, 0) - par[0];
+			double      erry = gsl_vector_get(s->x, 1) - par[1];
+			absErr = fabs(errx) + fabs(erry);
 
-        printf("%5d %10.3e %10.3e %7.3f %8.3f %8.4f %8.4f\n",
-               itr,
-               gsl_vector_get(s->x, 0),
-               gsl_vector_get(s->x, 1), s->fval, size, absErr, temperature);
-    } while(status == GSL_CONTINUE && itr < maxItr);
-    switch (status) {
-    case GSL_SUCCESS:
-        printf("converged to minimum\n");
-        break;
-    default:
-        printf("no convergence: status=%d itr=%d\n", status, itr);
-    }
-    printf("True minimum: (%lf, %lf)\n", par[0], par[1]);
+			itr++;
+			if(verbose) 
+				printf("%3d %5d %10.3e %10.3e %7.3f %8.3f %8.4f %8.4f\n",
+					   try, itr,
+					   gsl_vector_get(s->x, 0),
+					   gsl_vector_get(s->x, 1), s->fval, size,
+					   absErr, temperature);
+		} while(status == GSL_CONTINUE && itr < maxItr);
+		if(!verbose) 
+			printf("%3d %5d %10.3e %10.3e %7.3f %8.3f %8.4f %8.4f ",
+				   try, itr,
+				   gsl_vector_get(s->x, 0),
+				   gsl_vector_get(s->x, 1), s->fval, size,
+				   absErr, temperature);
+		switch (status) {
+		case GSL_SUCCESS:
+			printf("converged\n");
+			break;
+		default:
+			printf("no convergence: status=%d\n", status);
+		}
+	}
 
+	printf("True minimum: (%lf, %lf)\n", par[0], par[1]);
     gsl_vector_free(x);
     gsl_vector_free(ss);
     gsl_multimin_fminimizer_free(s);

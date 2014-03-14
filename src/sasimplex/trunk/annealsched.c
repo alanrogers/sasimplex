@@ -8,7 +8,9 @@
 struct AnnealSched {
     int         nTmptrs;         /* number of temperature values */
     int         nPerTmptr;       /* iterations per temperature value */
-    int         currTmptr, currIteration;
+	double      initTmptr;       /* initial temperature */
+	double      param;           /* controls rate of temperature decline */
+    int         iTmptr, itr;
     double     *tmptr;           /* array of temperature values */
 };
 
@@ -22,7 +24,7 @@ struct AnnealSched {
  */
 AnnealSched *AnnealSched_alloc(int nTmptrs, int nPerTmptr, double initTmptr,
                                double deflationFactor) {
-    int         i;
+	int i;
     AnnealSched *s = malloc(sizeof(AnnealSched));
     if(s == NULL) {
         fprintf(stderr, "bad malloc\n");
@@ -35,14 +37,20 @@ AnnealSched *AnnealSched_alloc(int nTmptrs, int nPerTmptr, double initTmptr,
         exit(1);
     }
 
-    s->currIteration = s->currTmptr = 0;
     s->nTmptrs = nTmptrs;
     s->nPerTmptr = nPerTmptr;
-    s->tmptr[0] = initTmptr;
-    for(i = 1; i < nTmptrs - 1; ++i)
-        s->tmptr[i] = deflationFactor * s->tmptr[i - 1];
-    s->tmptr[nTmptrs - 1] = 0.0;
-    return s;
+	s->initTmptr = initTmptr;
+	s->param = deflationFactor;
+    s->tmptr[0] = s->initTmptr;
+    for(i = 1; i < s->nTmptrs - 1; ++i)
+        s->tmptr[i] = s->param * s->tmptr[i - 1];
+    s->tmptr[s->nTmptrs - 1] = 0.0;
+	AnnealSched_reset(s);
+	return s;
+}
+
+void AnnealSched_reset(AnnealSched *s) {
+    s->itr = s->iTmptr = 0;
 }
 
 /** Free memory allocated for annealing schedule */
@@ -54,13 +62,13 @@ void AnnealSched_free(AnnealSched * s) {
 /** Get next temperature */
 double AnnealSched_next(AnnealSched * s) {
     double      currTmptr;
-    currTmptr = s->tmptr[s->currTmptr];
-    ++s->currIteration;
-    if(s->currIteration == s->nPerTmptr) {
-        s->currIteration = 0;
-        ++s->currTmptr;
-        if(s->currTmptr == s->nTmptrs)
-            s->currTmptr = s->nTmptrs - 1;
+    currTmptr = s->tmptr[s->iTmptr];
+    ++s->itr;
+    if(s->itr == s->nPerTmptr) {
+        s->itr = 0;
+        ++s->iTmptr;
+        if(s->iTmptr == s->nTmptrs)
+            s->iTmptr = s->nTmptrs - 1;
     }
     return currTmptr;
 }
