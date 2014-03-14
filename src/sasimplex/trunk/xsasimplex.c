@@ -36,7 +36,7 @@ int main(void) {
     const int   maxItr = 1000;
     double      initStepSize = 0.05;
     const int   rotate = 1;             /* random rotation of init simplex?*/
-	const int   verbose = 0;	
+	const int   verbose = 1;	
     unsigned long seed = time(NULL);    /* for random numbers */
 	unsigned    nTries = 10;            /* number of random starts */
 
