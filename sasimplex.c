@@ -659,7 +659,8 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
 
 int
 sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
-                          int rotate, gsl_vector * lo, gsl_vector * hi,
+                          int rotate, gsl_vector * lo,
+                          gsl_vector * hi,
                           const gsl_vector * step_size) {
     sasimplex_state_t *state = minimizer->state;
     gsl_multimin_function *func = minimizer->f;
