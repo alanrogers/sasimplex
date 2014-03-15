@@ -10,8 +10,8 @@ void        sasimplex_random_seed(gsl_multimin_fminimizer * minimizer,
                                   unsigned seed);
 void        sasimplex_set_temp(gsl_multimin_fminimizer * minimizer,
                                double temperature);
-int         sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer, 
-                                      int rotate, gsl_vector *lo,
-                                      gsl_vector *hi,
-                                      const gsl_vector * step_size);
+int         sasimplex_randomize_state(gsl_multimin_fminimizer *minimizer,
+                          int rotate, gsl_vector * lo,
+                          gsl_vector * hi,
+                          const gsl_vector * step_size);
 #endif                       /* __GSL_SASIMPLEX_H__ */
