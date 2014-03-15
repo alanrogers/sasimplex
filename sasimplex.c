@@ -50,7 +50,6 @@
 #include "sasimplex.h"
 #include <stdio.h>
 #include <math.h>
-#include <config.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <gsl/gsl_blas.h>
