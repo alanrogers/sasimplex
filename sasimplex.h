@@ -14,4 +14,6 @@ int         sasimplex_randomize_state(gsl_multimin_fminimizer *minimizer,
                           int rotate, gsl_vector * lo,
                           gsl_vector * hi,
                           const gsl_vector * step_size);
+double      sasimplex_vertical_scale(gsl_multimin_fminimizer *minimizer);
+
 #endif                       /* __GSL_SASIMPLEX_H__ */
