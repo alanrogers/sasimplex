@@ -108,6 +108,7 @@ struct sasimplex_state_t {
     gsl_vector *xmc;            /* x - center (workspace) */
     double      S2;
     double      temperature;    /* increase to flatten surface */
+    double      bestEver;       /* best func val ever seen */
     unsigned long count;
 	unsigned    seedSet;        /* 0 initially; 1 after seed is set */
     unsigned    seed;           /* for random number generator */
@@ -243,10 +244,14 @@ contract_by_best(sasimplex_state_t * state, size_t best,
             newval = GSL_MULTIMIN_FN_EVAL(f, xc);
             gsl_vector_set(f1, i, newval);
 
-            /* notify caller that we found at least one bad function value.
-             * we finish the contraction (and do not abort) to allow the user
-             * to handle the situation */
-            if(!gsl_finite(newval)) {
+            if(gsl_finite(newval)) {
+                if(newval < state->bestEver)
+                    state->bestEver = newval;
+            }else{
+                /* notify caller that we found at least one bad
+                 * function value.  we finish the contraction (and do
+                 * not abort) to allow the user to handle the
+                 * situation */
                 status = GSL_EBADFUNC;
             }
         }
@@ -379,6 +384,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     state->count = 0;
     state->temperature = 0.0;
     state->seedSet = state->seed = 0;
+    state->bestEver = DBL_MAX;
 
 #ifdef DEBUGGING
     fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
@@ -434,6 +440,19 @@ void sasimplex_random_seed(gsl_multimin_fminimizer * minimizer, unsigned seed) {
 	state->seedSet = 1;
 }
 
+/*
+ * Measure vertical scale of simplex as the difference between the
+ * current maximum function value and the smallest value ever seen.
+ */
+double sasimplex_vertical_scale(gsl_multimin_fminimizer *minimizer) {
+    sasimplex_state_t *state = minimizer->state;
+    double y = gsl_vector_max(state->f1) - state->bestEver;
+    assert(state->bestEver < DBL_MAX);
+    assert(y >= 0.0);
+    return y;
+}
+
+
 static int
 sasimplex_set(void *vstate, gsl_multimin_function * f,
               const gsl_vector * x,
@@ -457,7 +476,10 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
 
     /* first point is the original x0 */
     val = GSL_MULTIMIN_FN_EVAL(f, x);
-    if(!gsl_finite(val)) {
+    if(gsl_finite(val)) {
+        if(val < state->bestEver)
+            state->bestEver = val;
+    }else{
         GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
     }
 
@@ -477,7 +499,10 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
             gsl_vector_set(xtemp, i, xi + si);
             val = GSL_MULTIMIN_FN_EVAL(f, xtemp);
         }
-        if(!gsl_finite(val)) {
+        if(gsl_finite(val)) {
+            if(val < state->bestEver)
+                state->bestEver = val;
+        }else{
             GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
         }
         gsl_matrix_set_row(state->x1, i + 1, xtemp);
@@ -577,6 +602,9 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     v = try_corner_move(-1.0, state, hi, xc, f);
     pv = v - ran_expn(&state->seed, temp);
 
+    if(gsl_finite(v) && v < state->bestEver)
+        state->bestEver = v;
+
     if(gsl_finite(pv) && pv < dlo) {
         /*
          * Reflected point is lowest, try expansion.  In the Numerical
@@ -586,6 +614,9 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
          */
         v2 = try_corner_move(-2.0, state, hi, xc2, f);
         pv2 = v2 - ran_expn(&state->seed, temp);
+
+        if(gsl_finite(v2) && v2 < state->bestEver)
+            state->bestEver = v2;
 
         if(gsl_finite(pv2) && pv2 < dlo) {
             update_point(state, hi, xc2, v2);
@@ -609,6 +640,9 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
         /* try one-dimensional contraction */
         v2 = try_corner_move(0.5, state, hi, xc2, f);
         pv2 = v2 - ran_expn(&state->seed, temp);
+
+        if(gsl_finite(v2) && v2 < state->bestEver)
+            state->bestEver = v2;
 
         if(gsl_finite(pv2) && pv2 <= dhi) {
             update_point(state, hi, xc2, v2);
@@ -701,7 +735,10 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
         gsl_matrix_set_row(state->x1, 0, xtemp);
 		gsl_vector_memcpy(minimizer->x, xtemp);
         val = GSL_MULTIMIN_FN_EVAL(func, xtemp);
-        if(!gsl_finite(val)) {
+        if(gsl_finite(val)) {
+            if(val < state->bestEver)
+                state->bestEver = val;
+        }else{
             GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
         }
         gsl_vector_set(state->f1, 0, val);
@@ -749,7 +786,10 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
         for(i = 0; i < stateDim; i++) {
             gsl_vector_view r_i = gsl_matrix_row(&m.matrix, i);
             val = GSL_MULTIMIN_FN_EVAL(minimizer->f, &r_i.vector);
-            if(!gsl_finite(val)) {
+            if(gsl_finite(val)) {
+                if(val < state->bestEver)
+                    state->bestEver = val;
+            }else{
                 GSL_ERROR("non-finite function value encountered",
                           GSL_EBADFUNC);
             }
