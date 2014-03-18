@@ -35,7 +35,7 @@ int main(void) {
     const double tol = 1e-4;
     double      initStepSize = 0.05;
     const int   rotate = 1;             /* random rotation of init simplex?*/
-	const int   verbose = 1;	
+	const int   verbose = 1;
     unsigned long seed = time(NULL);    /* for random numbers */
 	unsigned    nTries = 10;            /* number of random starts */
     int         nT  = 10;               /* number of temperatures */
@@ -84,29 +84,19 @@ int main(void) {
     sasimplex_random_seed(s, seed);
 
     printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(s));
-    if(!verbose) {
-        printf(" %5s %7s %8s %8s %8s\n",
-               "itr", "fval", "size", "vscale", "tmptr");
-    }
 	for(try=0; try < nTries; ++try) {
-        int itr=0;   /* iteration within current temperature */
         int iT = 0;  /* index of current temperature */
 		AnnealSched_reset(sched);
 		if(try > 0)
 			sasimplex_randomize_state(s, rotate, loInit, hiInit, ss);
-		printf("%3d %5d %10.3e %10.3e\n",
-			   try, itr,
-			   gsl_vector_get(s->x, 0),
-			   gsl_vector_get(s->x, 1));
         for(iT=0; iT<nT; ++iT) {  /* iterate over temperatures */
-            AnnealSched_print(sched, stdout);
             temperature = AnnealSched_next(sched);
             status = sasimplex_n_iterations(s,
                                             &size,
                                             tol,
                                             nPerT,
                                             temperature,
-                                            1);
+                                            verbose);
 
             /* absErr is summed absolute error */
             double      errx = gsl_vector_get(s->x, 0) - par[0];
@@ -122,13 +112,13 @@ int main(void) {
                 break;
         }
         if(!verbose) {
-            printf(" %5d %7.3f %8.3f %8.4f %8.4f\n",
-                   itr, s->fval, size,
-                   sasimplex_vertical_scale(s),
-                   temperature);
-            printf("try=%d x=%.4f y=%.4f abserr=%.4e\n",
+            printf("try=%d (x,y)=(%.4f,%.4f) abserr=%.4e",
                    try, gsl_vector_get(s->x, 0),
                    gsl_vector_get(s->x, 1), absErr);
+            printf(" size=%.4e vscale=%.4f T=%.4f\n",
+                   size,
+                   sasimplex_vertical_scale(s),
+                   temperature);
         }
 		switch (status) {
 		case GSL_SUCCESS:
