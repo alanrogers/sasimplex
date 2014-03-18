@@ -50,10 +50,10 @@ int main(void) {
     gsl_vector_set_all(ss, initStepSize);
 
     /* Set up annealing schedule */
-    AnnealSched *sched = AnnealSched_alloc(5,   /* number of temperatures */
+    AnnealSched *sched = AnnealSched_alloc(10,   /* number of temperatures */
                                            100, /* iterations per temperature */
-                                           2.0, /* initial rel tmptr */
-                                           0.5  /* ratio of rel tmptr decay */
+                                           1.0, /* initial rel tmptr */
+                                           1.0  /* ratio of rel tmptr decay */
         );
 
     /* Initial state vector */
