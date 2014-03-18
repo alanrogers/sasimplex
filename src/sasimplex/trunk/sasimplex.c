@@ -813,3 +813,47 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
     state->count++;
     return GSL_SUCCESS;
 }
+
+/*
+ * Do multiple iterations with given temperature. Iterations stop when
+ * simplex size declines to tol or when the maximim number, nItr, of
+ * iterations is reached. The final simplex size is returned in *size.
+ * The function returns the value returned by the final iteration of
+ * gsl_multimin_fminimizer_iterate.
+ */
+int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
+                           double *size,
+                           double tol,
+                           int nItr,
+                           double temperature,
+                           int verbose) {
+    int itr=0, status;
+
+    sasimplex_set_temp(minimizer, temperature);
+    if(verbose) {
+        printf(" %5s %7s %8s %8s %8s\n",
+               "itr", "fval", "size", "vscale", "tmptr");
+    }
+    do {
+        status = gsl_multimin_fminimizer_iterate(minimizer);
+        if(status) {
+            printf("%s:%d:%s: rtn val %d from %s\n",
+                   __FILE__, __LINE__, __func__,
+                   status, "gsl_multimin_fminimizer_iterate");
+            break;
+        }
+
+        *size = gsl_multimin_fminimizer_size(minimizer);
+        status = gsl_multimin_test_size(*size, tol);
+
+        if(verbose) {
+            printf(" %5d %7.3f %8.3f %8.4f %8.4f\n",
+                   itr, minimizer->fval, *size,
+                   sasimplex_vertical_scale(minimizer),
+                   temperature);
+        }
+        ++itr;
+    }while(status == GSL_CONTINUE && itr < nItr);
+
+    return status;
+}    

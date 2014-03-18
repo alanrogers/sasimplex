@@ -15,5 +15,8 @@ int         sasimplex_randomize_state(gsl_multimin_fminimizer *minimizer,
                           gsl_vector * hi,
                           const gsl_vector * step_size);
 double      sasimplex_vertical_scale(gsl_multimin_fminimizer *minimizer);
+int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
+                           double *size, double tol, int nItr,
+                           double temperature, int verbose);
 
 #endif                       /* __GSL_SASIMPLEX_H__ */
