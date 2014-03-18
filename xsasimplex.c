@@ -8,8 +8,8 @@
 double      my_f(const gsl_vector * v, void *params);
 
 /*
- * Multiple minima wherever x and y are integers. Global minimum
- * at (x,y)=(par[0],par[1]).
+ * Local minima wherever x-par[0] and y-par[1] are integers. Global
+ * minimum at (x,y)=(par[0],par[1]).
  */
 double my_f(const gsl_vector * v, void *params) {
     double      x, y;
