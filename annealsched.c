@@ -3,149 +3,74 @@
 #include "annealsched.h"
 
 /**
- * This structure represents a schedule of annealing temperatures.
+ * This structure represents a schedule of relative annealing
+ * temperatures. The "relative temperature" is the ratio of absolute
+ * temperature to some measure of vertical scale--of the variation in
+ * function values.  The measure of scale is not part of AnnealSched,
+ * but is provided as an argument to AnnealSched_next.
  */
 struct AnnealSched {
-    int         nTmptrs;         /* number of temperature values */
-    int         nPerTmptr;       /* iterations per temperature value */
-	double      initTmptr;       /* initial temperature */
-	double      param;           /* controls rate of temperature decline */
-    int         iTmptr, itr;
-    double     *tmptr;           /* array of temperature values */
+    int         nT;                /* number of temperature values */
+    int         nPerT;             /* iterations per temperature value */
+    int         iT;                /* index of current tmptr */
+    int         itr;               /* iteration w/i current tmptr */
+	double      currRelT;          /* currRelT = tmptr/scale */
+    double      initRelT;          /* initial value of currRelT */
+    double      decay;             /* rate at which currRelT decays */
 };
 
-#define LINEAR_ANNEALING_SCHEDULE
-
-#ifdef GEOMETRIC_ANNEALING_SCHEDULE
 /**
  * Allocate and initialize annealing schedule for sasimplex.
  *
- * nTmptrs  : the number of temperatures
- * nPerTmptr: the number of iterations at each temperature
- * initTmptr: initial temperature
- * param: the ratio of temperature i+1 to temperature i
+ * nT      : the number of temperatures
+ * nPerT   : the number of iterations at each temperature
+ * initRelT: initial relative temperature
+ * decay   : the rate at which relT declines
  */
-AnnealSched *AnnealSched_alloc(int nTmptrs, int nPerTmptr, double initTmptr,
-                               double param) {
-	int i;
+AnnealSched *AnnealSched_alloc(int nT, int nPerT, double initRelT,
+                               double decay) {
     AnnealSched *s = malloc(sizeof(AnnealSched));
     if(s == NULL) {
         fprintf(stderr, "bad malloc\n");
         exit(1);
     }
-    s->tmptr = malloc(nTmptrs * sizeof(s->tmptr[0]));
-    if(s->tmptr == NULL) {
-        free(s);
-        fprintf(stderr, "bad malloc\n");
-        exit(1);
-    }
-
-    s->nTmptrs = nTmptrs;
-    s->nPerTmptr = nPerTmptr;
-	s->initTmptr = initTmptr;
-	s->param = param;
-    s->tmptr[0] = s->initTmptr;
-    for(i = 1; i < s->nTmptrs - 1; ++i)
-        s->tmptr[i] = s->param * s->tmptr[i - 1];
-    s->tmptr[s->nTmptrs - 1] = 0.0;
+    s->initRelT = initRelT;
+    s->nT = nT;
+    s->nPerT = nPerT;
+    s->decay = decay;
 	AnnealSched_reset(s);
 	return s;
 }
-#elif defined(LINEAR_ANNEALING_SCHEDULE)
-/**
- * Allocate and initialize annealing schedule for sasimplex.
- *
- * nTmptrs  : the number of temperatures
- * nPerTmptr: the number of iterations at each temperature
- * initTmptr: initial temperature
- * param: the ratio of temperature i+1 to temperature i
- */
-AnnealSched *AnnealSched_alloc(int nTmptrs, int nPerTmptr, double initTmptr,
-                               double param) {
-	int i;
-    AnnealSched *s = malloc(sizeof(AnnealSched));
-    if(s == NULL) {
-        fprintf(stderr, "bad malloc\n");
-        exit(1);
-    }
-    s->tmptr = malloc(nTmptrs * sizeof(s->tmptr[0]));
-    if(s->tmptr == NULL) {
-        free(s);
-        fprintf(stderr, "bad malloc\n");
-        exit(1);
-    }
-
-    double  step = initTmptr/ (nTmptrs - 1);
-    s->nTmptrs = nTmptrs;
-    s->nPerTmptr = nPerTmptr;
-	s->initTmptr = initTmptr;
-	s->param = param;
-    s->tmptr[0] = s->initTmptr;
-    for(i = 0; i < s->nTmptrs - 1; ++i)
-        s->tmptr[i] = initTmptr - i*step;
-    s->tmptr[s->nTmptrs - 1] = 0.0;
-	AnnealSched_reset(s);
-	return s;
-}
-#elif defined(ADAPTIVE_ANNEALING_SCHEDULE)
-/**
- * Allocate and initialize annealing schedule for sasimplex.
- *
- * nTmptrs  : the number of temperatures
- * nPerTmptr: the number of iterations at each temperature
- * initTmptr: initial temperature
- * param: the ratio of temperature i+1 to temperature i
- */
-AnnealSched *AnnealSched_alloc(int nTmptrs, int nPerTmptr, double initTmptr,
-                               double param) {
-	int i;
-    AnnealSched *s = malloc(sizeof(AnnealSched));
-    if(s == NULL) {
-        fprintf(stderr, "bad malloc\n");
-        exit(1);
-    }
-    s->tmptr = malloc(nTmptrs * sizeof(s->tmptr[0]));
-    if(s->tmptr == NULL) {
-        free(s);
-        fprintf(stderr, "bad malloc\n");
-        exit(1);
-    }
-
-    s->nTmptrs = nTmptrs;
-    s->nPerTmptr = nPerTmptr;
-	s->initTmptr = initTmptr;
-	s->param = param;
-    s->tmptr[0] = s->initTmptr;
-    for(i = 1; i < s->nTmptrs - 1; ++i)
-        s->tmptr[i] = s->param * s->tmptr[i - 1];
-    s->tmptr[s->nTmptrs - 1] = 0.0;
-	AnnealSched_reset(s);
-	return s;
-}
-#else
-#  error "ANNEALING_SCHEDULE undefined"
-#endif
 
 void AnnealSched_reset(AnnealSched *s) {
-    s->itr = s->iTmptr = 0;
+    s->itr = 0;            /* range: 0..(nPerT-1) */
+    s->iT = 0;             /* range: 0..(nT-1) */
+    s->currRelT = s->initRelT;
 }
 
 /** Free memory allocated for annealing schedule */
 void AnnealSched_free(AnnealSched * s) {
-    free(s->tmptr);
     free(s);
 }
 
 /** Get next temperature */
 double AnnealSched_next(AnnealSched * s, double scale) {
-    double      currTmptr;
-    currTmptr = s->tmptr[s->iTmptr];
     ++s->itr;
-    if(s->itr == s->nPerTmptr) {
+    if(s->itr == s->nPerT) {
         s->itr = 0;
-        ++s->iTmptr;
-        if(s->iTmptr == s->nTmptrs)
-            s->iTmptr = s->nTmptrs - 1;
+        if(s->iT == s->nT - 1) {
+            s->currRelT = 0.0;
+        }else{
+            ++s->iT;
+            s->currRelT *= s->decay;
+        }
     }
-    return currTmptr;
+    return scale * s->currRelT;
+}
+
+void AnnealSched_print(AnnealSched *s, FILE *fp) {
+    fprintf(fp, "itr=%d/%d iT=%d/%d\n", s->itr, s->nPerT,
+            s->iT, s->nT);
+    fprintf(fp, "relT: init=%lf curr=%lf decay=%lf\n",
+            s->initRelT, s->currRelT, s->decay);
 }

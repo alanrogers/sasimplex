@@ -446,10 +446,12 @@ void sasimplex_random_seed(gsl_multimin_fminimizer * minimizer, unsigned seed) {
  */
 double sasimplex_vertical_scale(gsl_multimin_fminimizer *minimizer) {
     sasimplex_state_t *state = minimizer->state;
-    double y = gsl_vector_max(state->f1) - state->bestEver;
+    double worst = gsl_vector_max(state->f1);
+    printf("%s:%d:%s: worst=%lf bestEver=%lf\n", __FILE__,__LINE__,
+           __func__, worst, state->bestEver);
     assert(state->bestEver < DBL_MAX);
-    assert(y >= 0.0);
-    return y;
+    assert(worst >= state->bestEver);
+    return worst  - state->bestEver;
 }
 
 
@@ -476,10 +478,7 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
 
     /* first point is the original x0 */
     val = GSL_MULTIMIN_FN_EVAL(f, x);
-    if(gsl_finite(val)) {
-        if(val < state->bestEver)
-            state->bestEver = val;
-    }else{
+    if(!gsl_finite(val)) {
         GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
     }
 
@@ -499,11 +498,7 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
             gsl_vector_set(xtemp, i, xi + si);
             val = GSL_MULTIMIN_FN_EVAL(f, xtemp);
         }
-        if(gsl_finite(val)) {
-            if(val < state->bestEver)
-                state->bestEver = val;
-        }else{
-            GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
+        if(!gsl_finite(val)) {
         }
         gsl_matrix_set_row(state->x1, i + 1, xtemp);
         gsl_vector_set(state->f1, i + 1, val);
@@ -512,6 +507,8 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
 
     /* Initialize simplex size */
     *size = compute_size(state, state->center);
+
+    state->bestEver = gsl_vector_min(state->f1);
 
     state->count++;
 #ifdef DEBUGGING
