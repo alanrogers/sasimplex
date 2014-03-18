@@ -52,8 +52,8 @@ int main(void) {
     /* Set up annealing schedule */
     AnnealSched *sched = AnnealSched_alloc(5,   /* number of temperatures */
                                            100, /* iterations per temperature */
-                                           4.0, /* initial temperature */
-                                           0.5  /* ratio of adjacent temps */
+                                           2.0, /* initial rel tmptr */
+                                           0.5  /* ratio of rel tmptr decay */
         );
 
     /* Initial state vector */
@@ -97,7 +97,10 @@ int main(void) {
 			   gsl_vector_get(s->x, 0),
 			   gsl_vector_get(s->x, 1));
 		do {
-			temperature = AnnealSched_next(sched);
+            AnnealSched_print(sched, stdout);
+            double vscale = sasimplex_vertical_scale(s);
+            printf("vscale=%lf\n", vscale);
+			temperature = AnnealSched_next(sched, vscale);
 			sasimplex_set_temp(s, temperature);
 			status = gsl_multimin_fminimizer_iterate(s);
 			if(status) {
