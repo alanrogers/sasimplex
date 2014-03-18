@@ -442,16 +442,27 @@ void sasimplex_random_seed(gsl_multimin_fminimizer * minimizer, unsigned seed) {
 
 /*
  * Measure vertical scale of simplex as the difference between the
- * current maximum function value and the smallest value ever seen.
+ * current minimum function value and the smallest value ever seen.
  */
 double sasimplex_vertical_scale(gsl_multimin_fminimizer *minimizer) {
     sasimplex_state_t *state = minimizer->state;
-    double worst = gsl_vector_max(state->f1);
-    printf("%s:%d:%s: worst=%lf bestEver=%lf\n", __FILE__,__LINE__,
-           __func__, worst, state->bestEver);
+    double currBest = gsl_vector_min(state->f1);
+
     assert(state->bestEver < DBL_MAX);
-    assert(worst >= state->bestEver);
-    return worst  - state->bestEver;
+    assert(currBest >= state->bestEver);
+
+#if 1
+    /*
+     * If currBest equals bestEver, then return the difference between
+     * the current max and min function values.
+     */
+    if(currBest == state->bestEver)
+        currBest = gsl_vector_max(state->f1);
+
+    assert(currBest > state->bestEver);
+#endif
+
+    return currBest  - state->bestEver;
 }
 
 
