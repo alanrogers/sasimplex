@@ -134,6 +134,26 @@ sasimplex_set_temp(gsl_multimin_fminimizer * minimizer, double temperature) {
     state->temperature = temperature;
 }
 
+/** Test convergence based on relative spread of function values */
+int
+sasimplex_converged(gsl_multimin_fminimizer * minimizer, double ftol) {
+    sasimplex_state_t *state = minimizer->state;
+
+    double best, worst, dy, tol1;
+    gsl_vector_minmax(state->f1, &best, &worst);
+
+    /* convergence criteria from zeroin */
+    tol1 = 4.0 * ftol * (fabs(worst) + fabs(best)) + ftol;
+    dy = fabs(worst - best);
+
+    printf("%s:%d:%s: best=%lf worst=%lf bestEver=%lf tol1=%lf dy=%lf :%d\n",
+           __FILE__, __LINE__, __func__,
+           best, worst, state->bestEver,
+           tol1, dy, (dy < tol1));
+ 
+    return (dy < tol1);
+}
+
 /*
  * This function alters only the value of vector xc. In
  * sasimplex_iterate, however, xc is a synonym for state->ws1. Thus,
@@ -827,7 +847,7 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
                            int nItr,
                            double temperature,
                            int verbose) {
-    int itr=0, status;
+    int itr=0, status, converged;
 
     sasimplex_set_temp(minimizer, temperature);
     if(verbose) {
@@ -844,7 +864,13 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
         }
 
         *size = gsl_multimin_fminimizer_size(minimizer);
+#if 0
         status = gsl_multimin_test_size(*size, tol);
+#else
+        converged = sasimplex_converged(minimizer, tol);
+        printf("%s:%d:%s: converged=%d\n",
+               __FILE__, __LINE__, __func__, converged);
+#endif
 
         if(verbose) {
             printf(" %5d %7.3f %8.3f %8.4f %8.4f\n",
@@ -853,7 +879,17 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
                    temperature);
         }
         ++itr;
-    }while(status == GSL_CONTINUE && itr < nItr);
+        /*
+          }while(status == GSL_CONTINUE && itr < nItr);
+        */
+    }while(!converged && itr < nItr);
 
+    printf("%s:%d:%s: status=%d converged=%d itr=%d/%d\n",
+           __FILE__, __LINE__, __func__, status, converged,
+           itr, nItr);
+
+    /*
     return status;
+    */
+    return converged;
 }    
