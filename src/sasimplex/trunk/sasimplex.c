@@ -203,6 +203,12 @@ try_corner_move(const double coeff,
     {
         double      alpha = (1 - coeff) * P / (P - 1.0);
         double      beta = (P * coeff - 1.0) / (P - 1.0);
+#if 0
+        printf("%s:%d: coef=%lf alpha=%lf beta=%lf\n",
+               __FILE__, __LINE__, coeff, alpha, beta);
+        fflush(stdout);
+#endif
+
         gsl_vector_const_view row = gsl_matrix_const_row(x1, corner);
 
         gsl_vector_memcpy(xc, state->center);
