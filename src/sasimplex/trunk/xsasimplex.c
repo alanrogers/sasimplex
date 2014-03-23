@@ -6,6 +6,27 @@
 #include <gsl/gsl_multimin.h>
 
 double      my_f(const gsl_vector * v, void *params);
+int         pr_vector(FILE *fp, const char *fmt, const gsl_vector * v);
+
+int pr_vector(FILE *fp, const char *fmt, const gsl_vector * v) {
+    int rval=0;
+    size_t i, n = v->size;
+    putc('[', fp);
+    if(n>0) {
+        rval = fprintf(fp, fmt, gsl_vector_get(v, 0));
+        if(rval <= 0)
+            return rval;
+        
+    }
+    for(i=1; i < n; ++i) {
+        fputs(", ", fp);
+        rval = fprintf(fp,fmt,  gsl_vector_get(v, i));
+        if(rval <= 0)
+            return rval;
+    }
+    putc(']', fp);
+    return rval;
+}
 
 /*
  * Local minima wherever x-par[0] and y-par[1] are integers. Global
@@ -35,15 +56,14 @@ int main(void) {
     const double tol = 1e-4;
     double      initStepSize = 0.05;
     const int   rotate = 1;             /* random rotation of init simplex?*/
-	const int   verbose = 1;
+	const int   verbose = 0;
     unsigned long seed = time(NULL);    /* for random numbers */
-	unsigned    nTries = 10;            /* number of random starts */
+	unsigned    nTries = 20;            /* number of random starts */
     int         nT  = 10;               /* number of temperatures */
     int         nPerT = 100;            /* iterations per temperature */
     double      initT = 3.0;            /* initial temperature */
     double      decay = 0.7;
 
-    const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_sasimplex;
     unsigned    i, try;
     int         status;
     double      size, absErr, temperature;
@@ -74,7 +94,10 @@ int main(void) {
     minex_func.f = my_f;
     minex_func.params = par;
 
-    gsl_multimin_fminimizer *s = gsl_multimin_fminimizer_alloc(T, STATEDIM);
+    const gsl_multimin_fminimizer_type *fmType 
+        = gsl_multimin_fminimizer_sasimplex;
+    gsl_multimin_fminimizer *s 
+        = gsl_multimin_fminimizer_alloc(fmType, STATEDIM);
     if(s == NULL) {
         fprintf(stderr, "%s:%d: bad allocation\n", __FILE__, __LINE__);
         exit(1);
@@ -104,7 +127,7 @@ int main(void) {
             absErr = fabs(errx) + fabs(erry);
 
             if(verbose) {
-                printf("try=%d x=%.4f y=%.4f abserr=%.4e\n",
+                printf("try=%d x=%.4lf y=%.4f abserr=%.4le\n",
                        try, gsl_vector_get(s->x, 0),
                        gsl_vector_get(s->x, 1), absErr);
             }
@@ -112,20 +135,17 @@ int main(void) {
                 break;
         }
         if(!verbose) {
-            printf("try=%d (x,y)=(%.4f,%.4f) abserr=%.4e",
-                   try, gsl_vector_get(s->x, 0),
-                   gsl_vector_get(s->x, 1), absErr);
-            printf(" size=%.4e vscale=%.4f T=%.4f\n",
-                   size,
-                   sasimplex_vertical_scale(s),
-                   temperature);
+            printf("%2d: size=%.4le aberr=%.4le vscale=%.4lf x=",
+                   try, size, absErr,
+                   sasimplex_vertical_scale(s));
+            pr_vector(stdout, "%.4lf", s->x);
         }
 		switch (status) {
 		case GSL_SUCCESS:
-			printf("converged\n");
+			printf(" converged\n");
 			break;
 		default:
-			printf("no convergence: status=%d\n", status);
+			printf(" no convergence: status=%d\n", status);
 		}
 	}
 
