@@ -60,7 +60,7 @@ int main(void) {
     unsigned long seed = time(NULL);    /* for random numbers */
 	unsigned    nTries = 20;            /* number of random starts */
     int         nT  = 10;               /* number of temperatures */
-    int         nPerT = 100;            /* iterations per temperature */
+    int         nPerT = 200;            /* iterations per temperature */
     double      initT = 3.0;            /* initial temperature */
     double      decay = 0.7;
 
@@ -144,8 +144,13 @@ int main(void) {
 		case GSL_SUCCESS:
 			printf(" converged\n");
 			break;
+        case GSL_CONTINUE:
+			printf(" no convergence in %d iterations at tmptr %lf\n",
+                   nPerT, temperature);
+            sasimplex_print(s);
+			break;
 		default:
-			printf(" no convergence: status=%d\n", status);
+			printf(" unknown status: %d\n", status);
 		}
 	}
 
