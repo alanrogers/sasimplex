@@ -126,6 +126,22 @@ static const gsl_multimin_fminimizer_type sasimplex_type = {
 const       gsl_multimin_fminimizer_type
     * gsl_multimin_fminimizer_sasimplex = &sasimplex_type;
 
+void sasimplex_print(gsl_multimin_fminimizer * minimizer) {
+    sasimplex_state_t *state = minimizer->state;
+    size_t n = state->center->size; /* dimension of state vector */
+    size_t i, j;
+
+    printf("Simplex\n");
+    for(i=0; i <= n; ++i) {
+        for(j=0; j < n; ++j)
+            printf(" %le", gsl_matrix_get(state->x1, i, j));
+        printf(": %le\n", gsl_vector_get(state->f1, i));
+    }
+    printf("tmptr=%lf\n", state->temperature);
+    printf("bestEver=%lf\n", state->bestEver);
+    printf("count=%lu\n", state->count);
+}
+
 /** Set temperature. */
 void
 sasimplex_set_temp(gsl_multimin_fminimizer * minimizer, double temperature) {
@@ -140,18 +156,19 @@ sasimplex_converged(gsl_multimin_fminimizer * minimizer, double ftol) {
     sasimplex_state_t *state = minimizer->state;
 
     double best, worst, dy, tol1;
-    gsl_vector_minmax(state->f1, &best, &worst);
 
+#if 0
+    gsl_vector_minmax(state->f1, &best, &worst);
+#else
+    worst = gsl_vector_max(state->f1);
+    best = state->bestEver;
+#endif
+    assert(worst >= best);
     /* convergence criteria from zeroin */
     tol1 = 4.0 * ftol * (fabs(worst) + fabs(best)) + ftol;
     dy = fabs(worst - best);
 
-    printf("%s:%d:%s: best=%lf worst=%lf bestEver=%lf tol1=%lf dy=%lf :%d\n",
-           __FILE__, __LINE__, __func__,
-           best, worst, state->bestEver,
-           tol1, dy, (dy < tol1));
- 
-    return (dy < tol1);
+    return ( dy < tol1 ? GSL_SUCCESS : GSL_CONTINUE );
 }
 
 /*
@@ -847,7 +864,7 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
                            int nItr,
                            double temperature,
                            int verbose) {
-    int itr=0, status, converged;
+    int itr=0, status;
 
     sasimplex_set_temp(minimizer, temperature);
     if(verbose) {
@@ -867,9 +884,7 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
 #if 0
         status = gsl_multimin_test_size(*size, tol);
 #else
-        converged = sasimplex_converged(minimizer, tol);
-        printf("%s:%d:%s: converged=%d\n",
-               __FILE__, __LINE__, __func__, converged);
+        status = sasimplex_converged(minimizer, tol);
 #endif
 
         if(verbose) {
@@ -879,17 +894,7 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
                    temperature);
         }
         ++itr;
-        /*
-          }while(status == GSL_CONTINUE && itr < nItr);
-        */
-    }while(!converged && itr < nItr);
+    }while(status == GSL_CONTINUE && itr < nItr);
 
-    printf("%s:%d:%s: status=%d converged=%d itr=%d/%d\n",
-           __FILE__, __LINE__, __func__, status, converged,
-           itr, nItr);
-
-    /*
     return status;
-    */
-    return converged;
 }    
