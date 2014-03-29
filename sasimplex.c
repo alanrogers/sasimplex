@@ -172,22 +172,19 @@ sasimplex_converged(gsl_multimin_fminimizer * minimizer, double ftol) {
 }
 
 /*
+ * Move a simplex corner scaled by coeff (negative value represents
+ * mirroring by the middle point of the "other" corner points) and
+ * gives new corner in xc and function value at xc as a return value
+ *
  * This function alters only the value of vector xc. In
  * sasimplex_iterate, however, xc is a synonym for state->ws1. Thus,
  * try_corner_move alters state->ws1.
- *
- * 
  */
 static double
 try_corner_move(const double coeff,
                 const sasimplex_state_t * state,
                 size_t corner,
                 gsl_vector * xc, const gsl_multimin_function * f) {
-    /* moves a simplex corner scaled by coeff (negative value represents 
-     * mirroring by the middle point of the "other" corner points)
-     * and gives new corner in xc and function value at xc as a 
-     * return value 
-     */
 
     /* matrix x1 is the simplex, each row representing a vertex. */
     gsl_matrix *x1 = state->x1;
@@ -202,11 +199,12 @@ try_corner_move(const double coeff,
 
     /*
      * xc = alpha*center + beta*corner
+     *    = center + beta*(corner - center)
      *
      * where
      *
      *     alpha = (1-coeff)*P/(P-1)
-     *     beta  = (P*coeff - 1)/(P-1)
+     *     beta  = (P*coeff - 1)/(P-1) = 1 - alpha
      *
      * If the state vector has 2 entries, then P=3. For this case,
      * here are some values of coef, alpha, and beta:
@@ -218,7 +216,7 @@ try_corner_move(const double coeff,
      */
     {
         double      alpha = (1.0 - coeff) * P / (P - 1.0);
-        double      beta = (P * coeff - 1.0) / (P - 1.0);
+        double      beta = 1.0 - alpha;
 #if 0
         printf("%s:%d: coef=%lf alpha=%lf beta=%lf\n",
                __FILE__, __LINE__, coeff, alpha, beta);
