@@ -29,30 +29,31 @@ int pr_vector(FILE *fp, const char *fmt, const gsl_vector * v) {
 }
 
 /*
- * Local minima wherever x-par[0] and y-par[1] are integers. Global
- * minimum at (x,y)=(par[0],par[1]).
+ * Local minima wherever all entries of v-par are integers. Global
+ * minimum at v=par.
  */
 double my_f(const gsl_vector * v, void *params) {
-    double      x, y;
-    double      fx, fy;         /* fractional parts of x and y */
+    size_t      i;
+    double      sx=0.0, sf=0.0;
+    double      x;
+    double      f;         /* fractional part of x */
     double      rval;
     double     *par = (double *) params;
 
-    x = gsl_vector_get(v, 0) - par[0];
-    y = gsl_vector_get(v, 1) - par[1];
-    fx = x - floor(x + 0.5);
-    fy = y - floor(y + 0.5);
+    for(i=0; i < v->size; ++i) {
+        x = gsl_vector_get(v, i) - par[i];  /* deviation from optimum */
+        f = x - floor(x + 0.5);             /* fractional part of x */
+        sx += fabs(x);                      /* summed absolute devs */
+        sf += fabs(f);                      /* summed fractional dev */
+    }
 
-    rval = 1.0 + fabs(fx) + fabs(fy);
-    rval *= 1.0 + fabs(x) + fabs(y);
-
-    return rval;
+    return (1.0 + sx) * (1.0 + sf);
 }
 
 #define STATEDIM 2
 
 int main(void) {
-    double      par[STATEDIM] = { 3.0, 2.0 };  /* (x,y) at minumum */
+    double      par[STATEDIM];         /* minumum */
     const double tol = 1e-4;
     double      initStepSize = 0.05;
     const int   rotate = 1;             /* random rotation of init simplex?*/
@@ -75,17 +76,21 @@ int main(void) {
     /* Set up annealing schedule */
     AnnealSched *sched = AnnealSched_alloc(nT, initT, decay);
 
-    /* Initial state vector */
-    double      initVal[STATEDIM] = {5.5, 7.5};
+    /*
+     * Initial state vector: (0,1,...)
+     * Optimal state vector: (1,1,...)
+     */
     gsl_vector *x = gsl_vector_alloc(STATEDIM);
-    for(i = 0; i < STATEDIM; ++i)
-        gsl_vector_set(x, i, initVal[i]);
+    for(i = 0; i < STATEDIM; ++i) {
+        par[i] = 1.0;
+        gsl_vector_set(x, i, (double) i);
+    }
 
 	/* for random restarts */
 	gsl_vector *loInit = gsl_vector_alloc(STATEDIM);
 	gsl_vector *hiInit = gsl_vector_alloc(STATEDIM);
-	gsl_vector_set_all(loInit, -4.5);
-	gsl_vector_set_all(hiInit, 4.5);
+	gsl_vector_set_all(loInit, -2.0 * STATEDIM);
+	gsl_vector_set_all(hiInit, 2.0 * STATEDIM);
 
     /* Initialize method and iterate */
     gsl_multimin_function minex_func;

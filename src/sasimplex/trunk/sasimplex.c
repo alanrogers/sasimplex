@@ -175,6 +175,8 @@ sasimplex_converged(gsl_multimin_fminimizer * minimizer, double ftol) {
  * This function alters only the value of vector xc. In
  * sasimplex_iterate, however, xc is a synonym for state->ws1. Thus,
  * try_corner_move alters state->ws1.
+ *
+ * 
  */
 static double
 try_corner_move(const double coeff,
@@ -198,9 +200,24 @@ try_corner_move(const double coeff,
     const size_t P = x1->size1;
     double      newval;
 
-    /* xc = (1-coeff)*(P/(P-1)) * center(all) + ((P*coeff-1)/(P-1))*x_corner */
+    /*
+     * xc = alpha*center + beta*corner
+     *
+     * where
+     *
+     *     alpha = (1-coeff)*P/(P-1)
+     *     beta  = (P*coeff - 1)/(P-1)
+     *
+     * If the state vector has 2 entries, then P=3. For this case,
+     * here are some values of coef, alpha, and beta:
+     *
+     *    coeff        alpha       beta
+     *     -1.0         3.00      -2.00
+     *     -2.0         4.50      -3.50
+     *      0.5         0.75       0.25
+     */
     {
-        double      alpha = (1 - coeff) * P / (P - 1.0);
+        double      alpha = (1.0 - coeff) * P / (P - 1.0);
         double      beta = (P * coeff - 1.0) / (P - 1.0);
 #if 0
         printf("%s:%d: coef=%lf alpha=%lf beta=%lf\n",
@@ -210,6 +227,9 @@ try_corner_move(const double coeff,
 
         gsl_vector_const_view row = gsl_matrix_const_row(x1, corner);
 
+        /*
+         * xc = alpha*center + beta*corner
+         */
         gsl_vector_memcpy(xc, state->center);
         gsl_blas_dscal(alpha, xc);
         gsl_blas_daxpy(beta, &row.vector, xc);
