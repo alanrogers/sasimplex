@@ -192,11 +192,10 @@ try_corner_move(const double coeff,
 
     /*
      * P is the number of rows in matrix state->x1, which is the
-     * number of vertices in the simplex--n+1, where n is the
+     * number, n+1, of vertices in the simplex, where n is the
      * dimension of the state vector.
      */
     const size_t P = x1->size1;
-
     double      newval;
 
     /* xc = (1-coeff)*(P/(P-1)) * center(all) + ((P*coeff-1)/(P-1))*x_corner */
