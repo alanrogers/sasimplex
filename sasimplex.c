@@ -275,14 +275,15 @@ update_point(sasimplex_state_t * state, size_t i,
     gsl_vector_set(state->f1, i, val);
 }
 
+/*
+ * Function contracts the simplex in respect to best valued
+ * corner. That is, all corners besides the best corner are
+ * moved. (This function is rarely called in practice, since it is the
+ * last choice, hence not optimised - BJG)
+ */
 static int
 contract_by_best(sasimplex_state_t * state, size_t best,
                  gsl_vector * xc, gsl_multimin_function * f) {
-
-    /* Function contracts the simplex in respect to best valued
-     * corner. That is, all corners besides the best corner are moved.
-     * (This function is rarely called in practice, since it is the last
-     * choice, hence not optimised - BJG)  */
 
     /* the xc vector is simply work space here */
     gsl_matrix *x1 = state->x1;
