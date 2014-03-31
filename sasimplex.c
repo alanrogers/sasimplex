@@ -74,6 +74,9 @@ static double try_corner_move(const double coeff,
                               size_t corner,
                               gsl_vector * xc,
                               const gsl_multimin_function * f);
+static double
+trial_vertex(const double p, gsl_vector *trial, const gsl_vector *h,
+             const gsl_vector *c, const gsl_multimin_function * f);
 static void update_point(sasimplex_state_t * state, size_t i,
                          const gsl_vector * x, double val);
 static int  contract_by_best(sasimplex_state_t * state, size_t best,
@@ -169,6 +172,65 @@ sasimplex_converged(gsl_multimin_fminimizer * minimizer, double ftol) {
     dy = fabs(worst - best);
 
     return ( dy < tol1 ? GSL_SUCCESS : GSL_CONTINUE );
+}
+
+/*
+ * Calculate a new trial vertex and associated function value.
+ *
+ * On input:
+ *
+ * p : the coefficient that determines whether we're doing a reflection,
+ *     an extension, an outside contraction, or an inside contraction.
+ * h : the vertex of simplex with highest function value
+ * c : the centroid of the simplex, including all n+1 points
+ *
+ * On output:
+ * trial :  the new trial vectex
+ *
+ * Function returns the function value at the new vertex.
+ */
+static double
+trial_vertex(const double p,
+             gsl_vector *trial, /* to hold new vertex */
+             const gsl_vector *h,   /* highest point in simplex */
+             const gsl_vector *c,   /* centroid of entire simplex */
+             const gsl_multimin_function * f) {
+
+    /* n is the dimension of the state space */
+    const size_t n = h->size;
+
+    {
+        /*
+         * We want to calculate a trial vertex as
+         *
+         *    trial = (1-p)*m + p*h = m + p*(m - h)
+         *
+         * where h is the vector defining the simplex point with
+         * highest function value and m is the centroid of the
+         * remaining points. However, the present code calculates c,
+         * the center of the entire simplex, not excluding the highest
+         * point. The formula above for "trial" is equivalent to
+         *
+         *    trial = (1-a)*c + a*h = c + a*(c - h)
+         *
+         * where 
+         *
+         *      a = (1 + (n+1)*p)/n
+         */
+        double      a = (1.0 + (n+1)*p)/n;
+#if 0
+        printf("%s:%d: p=%lf a=%lf\n",
+               __FILE__, __LINE__, p, a);
+        fflush(stdout);
+#endif
+        /* trial = (1-a)*c + a*h */
+        gsl_vector_memcpy(trial, c);
+        gsl_blas_dscal(1.0-a, trial);
+        gsl_blas_daxpy(a, h, trial);
+    }
+
+    /* new function value */
+    return GSL_MULTIMIN_FN_EVAL(f, trial);
 }
 
 /*
