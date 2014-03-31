@@ -325,9 +325,17 @@ contract_by_best(sasimplex_state_t * state, size_t best,
     return status;
 }
 
+/*
+ * Calculate the center of the simplex and stores in center.
+ *
+ * This routine calculates the center of all points, rather than
+ * of only the P-1 best points. The difference is only cosmetic,
+ * because one can express the algorithm either way. It is important
+ * to keep straight, however, when trying to reconcile variants of the
+ * Nelder-Mead algorithm.
+ */
 static int
 compute_center(const sasimplex_state_t * state, gsl_vector * center) {
-    /* calculates the center of the simplex and stores in center */
     gsl_matrix *x1 = state->x1;
     const size_t P = x1->size1;
     size_t      i;
