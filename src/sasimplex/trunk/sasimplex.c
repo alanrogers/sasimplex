@@ -74,9 +74,9 @@ static double try_corner_move(const double coeff,
                               size_t corner,
                               gsl_vector * xc,
                               const gsl_multimin_function * f);
-static double
-trial_vertex(const double p, gsl_vector *trial, const gsl_vector *h,
-             const gsl_vector *c, const gsl_multimin_function * f);
+static double trial_point(const double p, gsl_vector *trial,
+						   const gsl_vector *h, const gsl_vector *c,
+						   const gsl_multimin_function * f);
 static void update_point(sasimplex_state_t * state, size_t i,
                          const gsl_vector * x, double val);
 static int  contract_by_best(sasimplex_state_t * state, size_t best,
@@ -92,6 +92,8 @@ static int  sasimplex_set(void *vstate, gsl_multimin_function * f,
                           double *size, const gsl_vector * step_size);
 static int  sasimplex_iterate(void *vstate, gsl_multimin_function * f,
                               gsl_vector * x, double *size, double *fval);
+static int  sasimplex_onestep(void *vstate, gsl_multimin_function * f,
+							  gsl_vector * x, double *size, double *fval);
 
 /**
  * This structure contains the state of the minimizer.
@@ -190,7 +192,7 @@ sasimplex_converged(gsl_multimin_fminimizer * minimizer, double ftol) {
  * Function returns the function value at the new vertex.
  */
 static double
-trial_vertex(const double p,
+trial_point(const double p,
              gsl_vector *trial, /* to hold new vertex */
              const gsl_vector *h,   /* highest point in simplex */
              const gsl_vector *c,   /* centroid of entire simplex */
@@ -199,35 +201,33 @@ trial_vertex(const double p,
     /* n is the dimension of the state space */
     const size_t n = h->size;
 
-    {
-        /*
-         * We want to calculate a trial vertex as
-         *
-         *    trial = (1-p)*m + p*h = m + p*(m - h)
-         *
-         * where h is the vector defining the simplex point with
-         * highest function value and m is the centroid of the
-         * remaining points. However, the present code calculates c,
-         * the center of the entire simplex, not excluding the highest
-         * point. The formula above for "trial" is equivalent to
-         *
-         *    trial = (1-a)*c + a*h = c + a*(c - h)
-         *
-         * where 
-         *
-         *      a = (1 + (n+1)*p)/n
-         */
-        double      a = (1.0 + (n+1)*p)/n;
+	/*
+	 * We want to calculate a trial vertex as
+	 *
+	 *    trial = (1-p)*m + p*h = m + p*(m - h)
+	 *
+	 * where h is the vector defining the simplex point with
+	 * highest function value and m is the centroid of the
+	 * remaining points. However, the present code calculates c,
+	 * the center of the entire simplex, not excluding the highest
+	 * point. The formula above for "trial" is equivalent to
+	 *
+	 *    trial = (1-a)*c + a*h = c + a*(c - h)
+	 *
+	 * where 
+	 *
+	 *      a = (1 + (n+1)*p)/n
+	 */
+	double      a = (1.0 + (n+1)*p)/n;
 #if 0
-        printf("%s:%d: p=%lf a=%lf\n",
-               __FILE__, __LINE__, p, a);
-        fflush(stdout);
+	printf("%s:%d: p=%lf a=%lf\n",
+		   __FILE__, __LINE__, p, a);
+	fflush(stdout);
 #endif
-        /* trial = (1-a)*c + a*h */
-        gsl_vector_memcpy(trial, c);
-        gsl_blas_dscal(1.0-a, trial);
-        gsl_blas_daxpy(a, h, trial);
-    }
+	/* trial = (1-a)*c + a*h */
+	gsl_vector_memcpy(trial, c);
+	gsl_blas_dscal(1.0-a, trial);
+	gsl_blas_daxpy(a, h, trial);
 
     /* new function value */
     return GSL_MULTIMIN_FN_EVAL(f, trial);
@@ -653,6 +653,191 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
     state->bestEver = gsl_vector_min(state->f1);
 
     state->count++;
+#ifdef DEBUGGING
+    fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
+            __func__);
+#endif
+    return GSL_SUCCESS;
+}
+
+static int
+sasimplex_onestep(void *vstate, gsl_multimin_function * f,
+                  gsl_vector * x, double *size, double *fval) {
+
+#ifdef DEBUGGING
+    fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
+#endif
+    /* Simplex iteration tries to minimize function f value */
+    /* Includes corrections from Ivo Alxneit <ivo.alxneit@psi.ch> */
+    sasimplex_state_t *state = (sasimplex_state_t *) vstate;
+
+    /* xc and xc2 vectors store tried corner point coordinates */
+    gsl_vector *xc = state->ws1;
+    gsl_vector *xc2 = state->ws2;
+    gsl_vector *f1 = state->f1;
+    gsl_matrix *x1 = state->x1;
+    const size_t n = f1->size;
+    size_t      i;
+    size_t      hi, lo;
+    double      dhi, ds_hi, dlo, hold;
+    int         status;
+    double      v, v2;          /* unperturbed trial values */
+    double      pv, pv2;        /* perturbed trial values */
+    double      temp = state->temperature;
+
+    if(xc->size != x->size) {
+        GSL_ERROR("incompatible size of x", GSL_EINVAL);
+    }
+
+	/*
+	 * Constants from Eqn 4.1 of "Implementing the Nelder-Mead simplex
+	 * algorithm with adaptive parameters", by Fuchang Gao and Lixing
+	 * Han (Computational Optimization and Applications
+	 * 51(1):259-277, 2012).
+	 */
+	const double alpha = 1.0;
+	const double beta = 1.0 + 2.0/n;
+	const double gmma = 0.75 - 1.0/(2.0*n);
+	const double delta = 1.0 - 1.0/n;
+
+    /*
+     * Find highest, second highest and lowest point. We need the
+     * indices (lo and hi) of the  low and high points, but we don't
+     * need the index of the second highest. We need the function
+     * values of all three.
+     *
+     * dlo, ds_hi, and dhi are function values at these three points,
+     * perturbed upward by random amounts. They are thus somewhat
+     * worse than the true function values.
+     */
+    lo = 0;
+    hi = 1;
+	ASSERT_SEED_SET(state);
+    dlo = gsl_vector_get(f1, lo) + ran_expn(&state->seed, temp);
+    dhi = gsl_vector_get(f1, hi) + ran_expn(&state->seed, temp);
+
+    if(dhi < dlo) {             /* swap lo and hi */
+        lo = 1;
+        hi = 0;
+        hold = lo;
+        dlo = dhi;
+        dhi = hold;
+    }
+    ds_hi = dlo;
+
+    for(i = 2; i < n; i++) {
+        v = gsl_vector_get(f1, i) + ran_expn(&state->seed, temp);
+        if(v < dlo) {
+            dlo = v;
+            lo = i;
+        } else if(v > dhi) {
+            ds_hi = dhi;
+            dhi = v;
+            hi = i;
+        } else if(v > ds_hi) {
+            ds_hi = v;
+        }
+    }
+	gsl_vector_const_view hvec = gsl_matrix_const_row(state->x1, hi);
+
+
+    /*
+     * Try reflecting the highest value point.
+     *
+     * v is the true function value at the trial point and pv is the
+     * perturbed version of that value. In contrast to the upward
+     * perturbations in dlo, ds_hi, and dhi, the perturbation here is
+     * downward, making the trial value a little better from the
+     * perspective of the minimizer. This encourages the algorithm to
+     * accept trial values--makes it eager to explore.
+     */
+	v = trial_point(-alpha, xc, &hvec.vector, state->center, f);
+	/*  v = try_corner_move(-1.0, state, hi, xc, f); */
+    pv = v - ran_expn(&state->seed, temp);
+
+    if(gsl_finite(v) && v < state->bestEver)
+        state->bestEver = v;
+
+    if(gsl_finite(pv) && pv < dlo) {
+        /*
+         * Reflected point is lowest, try expansion.  In the Numerical
+         * Recipes function amebsa, the analog of the the line below
+         * is a call to amotsa, but has +2.0 rather than -2.0. What is
+         * the difference?
+         */
+		v2 = trial_point(-alpha*beta, xc2, &hvec.vector, state->center, f);
+		/* v2 = try_corner_move(-2.0, state, hi, xc2, f); */
+        pv2 = v2 - ran_expn(&state->seed, temp);
+
+        if(gsl_finite(v2) && v2 < state->bestEver)
+            state->bestEver = v2;
+
+        if(gsl_finite(pv2) && pv2 < dlo) {
+            update_point(state, hi, xc2, v2);
+            dhi = pv2;
+        } else {
+            update_point(state, hi, xc, v);
+            dhi = pv;
+        }
+    } else if(!gsl_finite(pv) || pv > ds_hi) {
+        /* reflection does not improve things enough, or we got a
+         * non-finite function value */
+
+        if(gsl_finite(v) && pv <= dhi) {
+            /* if trial point is better than highest point, replace
+             * highest point */
+
+            update_point(state, hi, xc, v);
+            dhi = pv;
+        }
+
+        /* try one-dimensional contraction */
+		v2 = trial_point(-alpha*gmma, xc2, &hvec.vector, state->center, f);
+		/* v2 = try_corner_move(0.5, state, hi, xc2, f); */
+        pv2 = v2 - ran_expn(&state->seed, temp);
+
+        if(gsl_finite(v2) && v2 < state->bestEver)
+            state->bestEver = v2;
+
+        if(gsl_finite(pv2) && pv2 <= dhi) {
+            update_point(state, hi, xc2, v2);
+            dhi = pv2;
+        } else {
+            /* contract simplex about the best point */
+            status = contract_by_best(state, lo, xc, f);
+
+            if(status != GSL_SUCCESS) {
+                GSL_ERROR("contraction failed", GSL_EFAILED);
+            }
+        }
+    } else {
+        /*
+         * Trial point is better than second highest point.  Insert it
+         * into the simplex, replacing the current high point. No need
+         * to reset dhi and ds_hi, because we are about to exit the
+         * function.
+         */
+        update_point(state, hi, xc, v);
+        dhi = pv;
+    }
+
+    /* return lowest point of simplex as x */
+    lo = gsl_vector_min_index(f1);
+    gsl_matrix_get_row(x, x1, lo);
+    *fval = gsl_vector_get(f1, lo);
+
+    /* Update simplex size */
+    {
+        double      S2 = state->S2;
+
+        if(S2 > 0.0) {
+            *size = sqrt(S2);
+        } else {
+            /* recompute if accumulated error has made size invalid */
+            *size = compute_size(state, state->center);
+        }
+    }
+
 #ifdef DEBUGGING
     fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
             __func__);
