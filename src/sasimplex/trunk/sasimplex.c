@@ -79,8 +79,9 @@ static double trial_point(const double p, gsl_vector *trial,
 						   const gsl_multimin_function * f);
 static void update_point(sasimplex_state_t * state, size_t i,
                          const gsl_vector * x, double val);
-static int  contract_by_best(sasimplex_state_t * state, size_t best,
-                             gsl_vector * xc, gsl_multimin_function * f);
+static int  contract_by_best(sasimplex_state_t * state, double delta,
+							 size_t best, gsl_vector * xc,
+							 gsl_multimin_function * f);
 static int  compute_center(const sasimplex_state_t * state,
                            gsl_vector * center);
 static double compute_size(sasimplex_state_t * state,
@@ -344,8 +345,9 @@ update_point(sasimplex_state_t * state, size_t i,
  * last choice, hence not optimised - BJG)
  */
 static int
-contract_by_best(sasimplex_state_t * state, size_t best,
-                 gsl_vector * xc, gsl_multimin_function * f) {
+contract_by_best(sasimplex_state_t * state, double delta,
+				 size_t best, gsl_vector * xc,
+				 gsl_multimin_function * f) {
 
     /* the xc vector is simply work space here */
     gsl_matrix *x1 = state->x1;
@@ -357,7 +359,7 @@ contract_by_best(sasimplex_state_t * state, size_t best,
     for(i = 0; i < x1->size1; i++) {
         if(i != best) {
             for(j = 0; j < x1->size2; j++) {
-                newval = 0.5 * (gsl_matrix_get(x1, i, j)
+                newval = delta * (gsl_matrix_get(x1, i, j)
                                 + gsl_matrix_get(x1, best, j));
                 gsl_matrix_set(x1, i, j, newval);
             }
@@ -719,7 +721,7 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
     if(dhi < dlo) {             /* swap lo and hi */
         lo = 1;
         hi = 0;
-        hold = lo;
+        hold = dlo;
         dlo = dhi;
         dhi = hold;
     }
@@ -755,16 +757,59 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
 	/*  v = try_corner_move(-1.0, state, hi, xc, f); */
     pv = v - ran_expn(&state->seed, temp);
 
-    if(gsl_finite(v) && v < state->bestEver)
+    if(v < state->bestEver)
         state->bestEver = v;
 
-    if(gsl_finite(pv) && pv < dlo) {
-        /*
-         * Reflected point is lowest, try expansion.  In the Numerical
-         * Recipes function amebsa, the analog of the the line below
-         * is a call to amotsa, but has +2.0 rather than -2.0. What is
-         * the difference?
-         */
+	if(dlo <= pv) {
+		assert(gsl_finite(pv));
+		if( pv < ds_hi ) {
+			/* dlo <= pv < ds_hi */
+            update_point(state, hi, xc, v);
+            dhi = pv;
+		}else if( pv < dhi ) {
+			/* ds_hi <= pv < dhi: try outside contraction.*/
+			v2 = trial_point(-alpha*gmma, xc2, &hvec.vector, state->center, f);
+			pv2 = v2 - ran_expn(&state->seed, temp);
+			if(pv2 <= pv) {
+				update_point(state, hi, xc2, v2);
+				dhi = pv2					;
+			}
+			/* outside contraction failed: contract around best */
+            status = contract_by_best(state, delta, lo, xc, f);
+		}else{
+			/* ds_hi <= pv */
+
+			/* dhi <= pv : try inside contraction */
+			v2 = trial_point(alpha*gmma, xc2, &hvec.vector, state->center, f);
+			pv2 = v2 - ran_expn(&state->seed, temp);
+			if(pv2 < dhi) {
+				update_point(state, hi, xc2, v2);
+				dhi = pv2					;
+			}
+			/* inside contraction failed: contract around best */
+            status = contract_by_best(state, delta, lo, xc, f);
+		}
+	}else if(pv < dlo) {
+		/* try expansion */
+		v2 = trial_point(-alpha*beta, xc2, &hvec.vector, state->center, f);
+		pv2 = v2 - ran_expn(&state->seed, temp);
+		if(pv2 <= pv) {
+			update_point(state, hi, xc2, v2);
+			dhi = pv2					;
+		}
+		/* expansion failed: update with reflected point, v */
+		update_point(state, hi, xc, v);
+		dhi = pv;					;
+	}else {
+		fprintf(stderr,"pv = %lf is not finite\n", pv);
+		assert( !gsl_finite(pv) );
+		exit(1);
+	}
+
+	/******* OLD CODE... ****************/
+
+    if(pv < dlo) {
+        /* Reflected point is lowest, try expansion. */
 		v2 = trial_point(-alpha*beta, xc2, &hvec.vector, state->center, f);
 		/* v2 = try_corner_move(-2.0, state, hi, xc2, f); */
         pv2 = v2 - ran_expn(&state->seed, temp);
@@ -779,19 +824,15 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
             update_point(state, hi, xc, v);
             dhi = pv;
         }
-    } else if(!gsl_finite(pv) || pv > ds_hi) {
-        /* reflection does not improve things enough, or we got a
-         * non-finite function value */
+    } else if( !gsl_finite(pv) || ds_hi < pv ) {
 
         if(gsl_finite(v) && pv <= dhi) {
-            /* if trial point is better than highest point, replace
-             * highest point */
-
+			/* ds_h < pv <= dhi */
             update_point(state, hi, xc, v);
             dhi = pv;
         }
 
-        /* try one-dimensional contraction */
+		/* ds_hi <= dhi < pv || !finite(pv): try contraction */
 		v2 = trial_point(-alpha*gmma, xc2, &hvec.vector, state->center, f);
 		/* v2 = try_corner_move(0.5, state, hi, xc2, f); */
         pv2 = v2 - ran_expn(&state->seed, temp);
@@ -804,7 +845,7 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
             dhi = pv2;
         } else {
             /* contract simplex about the best point */
-            status = contract_by_best(state, lo, xc, f);
+            status = contract_by_best(state, delta, lo, xc, f);
 
             if(status != GSL_SUCCESS) {
                 GSL_ERROR("contraction failed", GSL_EFAILED);
@@ -893,7 +934,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     if(dhi < dlo) {             /* swap lo and hi */
         lo = 1;
         hi = 0;
-        hold = lo;
+        hold = dlo;
         dlo = dhi;
         dhi = hold;
     }
@@ -973,7 +1014,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
             dhi = pv2;
         } else {
             /* contract simplex about the best point */
-            status = contract_by_best(state, lo, xc, f);
+            status = contract_by_best(state, 0.5, lo, xc, f);
 
             if(status != GSL_SUCCESS) {
                 GSL_ERROR("contraction failed", GSL_EFAILED);
