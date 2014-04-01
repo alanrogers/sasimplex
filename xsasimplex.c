@@ -37,7 +37,6 @@ double my_f(const gsl_vector * v, void *params) {
     double      sx=0.0, sf=0.0;
     double      x;
     double      f;         /* fractional part of x */
-    double      rval;
     double     *par = (double *) params;
 
     for(i=0; i < v->size; ++i) {
