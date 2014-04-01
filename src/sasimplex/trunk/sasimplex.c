@@ -95,6 +95,8 @@ static int  sasimplex_iterate(void *vstate, gsl_multimin_function * f,
                               gsl_vector * x, double *size, double *fval);
 static int  sasimplex_onestep(void *vstate, gsl_multimin_function * f,
 							  gsl_vector * x, double *size, double *fval);
+static size_t vector_min_index(const gsl_vector *v);
+static inline double sasimplex_size(sasimplex_state_t *state);
 
 /**
  * This structure contains the state of the minimizer.
@@ -146,6 +148,34 @@ void sasimplex_print(gsl_multimin_fminimizer * minimizer) {
     printf("tmptr=%lf\n", state->temperature);
     printf("bestEver=%lf\n", state->bestEver);
     printf("count=%lu\n", state->count);
+}
+
+/*
+ * This code is based on the source for gsl_vector_min_index, which
+ * returns the index of the smallest entry in vector v.
+ *
+ * If the standard code is compiled with the macro FP defined,
+ * it will return the index not of the minimum non-NaN value, but of
+ * the first NaN encountered in vector v. The present code ignores NaN
+ * values and uses gsl_vector_get to retrieve values. It also changes 
+ * the lower bound of the loop from 0 to 1.
+ */
+static size_t vector_min_index(const gsl_vector *v) {
+  const size_t N = v->size ;
+
+  double min = gsl_vector_get(v, 0);
+  size_t imin = 0;
+  size_t i;
+
+  for (i = 1; i < N; i++)  {
+      double x = gsl_vector_get(v, i);
+      if (x < min) {
+          min = x;
+          imin = i;
+        }
+    }
+
+  return imin;
 }
 
 /** Set temperature. */
@@ -353,14 +383,15 @@ contract_by_best(sasimplex_state_t * state, double delta,
     gsl_matrix *x1 = state->x1;
     gsl_vector *f1 = state->f1;
     size_t      i, j;
-    double      newval;
     int         status = GSL_SUCCESS;
 
     for(i = 0; i < x1->size1; i++) {
         if(i != best) {
+            double      newval;
             for(j = 0; j < x1->size2; j++) {
-                newval = delta * (gsl_matrix_get(x1, i, j)
-                                + gsl_matrix_get(x1, best, j));
+                double xbest = gsl_matrix_get(x1, best, j);
+                double xi  = gsl_matrix_get(x1, i, j);
+                newval = xbest + delta*(xi - xbest);
                 gsl_matrix_set(x1, i, j, newval);
             }
 
@@ -373,10 +404,8 @@ contract_by_best(sasimplex_state_t * state, double delta,
                 if(newval < state->bestEver)
                     state->bestEver = newval;
             }else{
-                /* notify caller that we found at least one bad
-                 * function value.  we finish the contraction (and do
-                 * not abort) to allow the user to handle the
-                 * situation */
+                /* Bad function value: finish contraction (and do not
+                 * abort) to allow the user to handle the situation */
                 status = GSL_EBADFUNC;
             }
         }
@@ -415,6 +444,16 @@ compute_center(const sasimplex_state_t * state, gsl_vector * center) {
         gsl_blas_dscal(alpha, center);
     }
     return GSL_SUCCESS;
+}
+
+static inline double
+sasimplex_size(sasimplex_state_t *state) {
+    double      S2 = state->S2;
+
+    if(S2 > 0.0) 
+        return sqrt(S2);
+    /* recompute if accumulated error has made size invalid */
+    return compute_size(state, state->center);
 }
 
 static double
@@ -676,20 +715,19 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
     /* xc and xc2 vectors store tried corner point coordinates */
     gsl_vector *xc = state->ws1;
     gsl_vector *xc2 = state->ws2;
-    gsl_vector *f1 = state->f1;
+    gsl_vector *fvec = state->f1;
     gsl_matrix *x1 = state->x1;
-    const size_t n = f1->size;
+    const size_t n = fvec->size;
     size_t      i;
     size_t      hi, lo;
     double      dhi, ds_hi, dlo, hold;
-    int         status;
+    int         status = GSL_SUCCESS;
     double      v, v2;          /* unperturbed trial values */
     double      pv, pv2;        /* perturbed trial values */
     double      temp = state->temperature;
 
-    if(xc->size != x->size) {
+    if(xc->size != x->size)
         GSL_ERROR("incompatible size of x", GSL_EINVAL);
-    }
 
 	/*
 	 * Constants from Eqn 4.1 of "Implementing the Nelder-Mead simplex
@@ -711,12 +749,15 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
      * dlo, ds_hi, and dhi are function values at these three points,
      * perturbed upward by random amounts. They are thus somewhat
      * worse than the true function values.
+     *
+     * Because of the perturbations, we can't use
+     * gsl_vector_minmax_index.
      */
     lo = 0;
     hi = 1;
 	ASSERT_SEED_SET(state);
-    dlo = gsl_vector_get(f1, lo) + ran_expn(&state->seed, temp);
-    dhi = gsl_vector_get(f1, hi) + ran_expn(&state->seed, temp);
+    dlo = gsl_vector_get(fvec, lo) + ran_expn(&state->seed, temp);
+    dhi = gsl_vector_get(fvec, hi) + ran_expn(&state->seed, temp);
 
     if(dhi < dlo) {             /* swap lo and hi */
         lo = 1;
@@ -728,7 +769,7 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
     ds_hi = dlo;
 
     for(i = 2; i < n; i++) {
-        v = gsl_vector_get(f1, i) + ran_expn(&state->seed, temp);
+        v = gsl_vector_get(fvec, i) + ran_expn(&state->seed, temp);
         if(v < dlo) {
             dlo = v;
             lo = i;
@@ -740,12 +781,11 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
             ds_hi = v;
         }
     }
+
+    /* simplex point with worst (largest) func value */
 	gsl_vector_const_view hvec = gsl_matrix_const_row(state->x1, hi);
 
-
     /*
-     * Try reflecting the highest value point.
-     *
      * v is the true function value at the trial point and pv is the
      * perturbed version of that value. In contrast to the upward
      * perturbations in dlo, ds_hi, and dhi, the perturbation here is
@@ -753,137 +793,57 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
      * perspective of the minimizer. This encourages the algorithm to
      * accept trial values--makes it eager to explore.
      */
+
+    /* reflection */
 	v = trial_point(-alpha, xc, &hvec.vector, state->center, f);
-	/*  v = try_corner_move(-1.0, state, hi, xc, f); */
     pv = v - ran_expn(&state->seed, temp);
 
-    if(v < state->bestEver)
-        state->bestEver = v;
-
-	if(dlo <= pv) {
-		assert(gsl_finite(pv));
-		if( pv < ds_hi ) {
-			/* dlo <= pv < ds_hi */
-            update_point(state, hi, xc, v);
-            dhi = pv;
-		}else if( pv < dhi ) {
-			/* ds_hi <= pv < dhi: try outside contraction.*/
-			v2 = trial_point(-alpha*gmma, xc2, &hvec.vector, state->center, f);
-			pv2 = v2 - ran_expn(&state->seed, temp);
-			if(pv2 <= pv) {
-				update_point(state, hi, xc2, v2);
-				dhi = pv2					;
-			}
-			/* outside contraction failed: contract around best */
-            status = contract_by_best(state, delta, lo, xc, f);
-		}else{
-			/* ds_hi <= pv */
-
-			/* dhi <= pv : try inside contraction */
-			v2 = trial_point(alpha*gmma, xc2, &hvec.vector, state->center, f);
-			pv2 = v2 - ran_expn(&state->seed, temp);
-			if(pv2 < dhi) {
-				update_point(state, hi, xc2, v2);
-				dhi = pv2					;
-			}
-			/* inside contraction failed: contract around best */
-            status = contract_by_best(state, delta, lo, xc, f);
-		}
-	}else if(pv < dlo) {
-		/* try expansion */
-		v2 = trial_point(-alpha*beta, xc2, &hvec.vector, state->center, f);
-		pv2 = v2 - ran_expn(&state->seed, temp);
-		if(pv2 <= pv) {
-			update_point(state, hi, xc2, v2);
-			dhi = pv2					;
-		}
-		/* expansion failed: update with reflected point, v */
-		update_point(state, hi, xc, v);
-		dhi = pv;					;
-	}else {
-		fprintf(stderr,"pv = %lf is not finite\n", pv);
-		assert( !gsl_finite(pv) );
-		exit(1);
-	}
-
-	/******* OLD CODE... ****************/
-
-    if(pv < dlo) {
-        /* Reflected point is lowest, try expansion. */
-		v2 = trial_point(-alpha*beta, xc2, &hvec.vector, state->center, f);
-		/* v2 = try_corner_move(-2.0, state, hi, xc2, f); */
+    if( pv < dlo ) {                          /* try expansion */
+        v2 = trial_point(-alpha*beta, xc2, &hvec.vector, state->center, f);
         pv2 = v2 - ran_expn(&state->seed, temp);
-
-        if(gsl_finite(v2) && v2 < state->bestEver)
-            state->bestEver = v2;
-
-        if(gsl_finite(pv2) && pv2 < dlo) {
+        if(pv2 < pv)                          /* accept expansion */
             update_point(state, hi, xc2, v2);
-            dhi = pv2;
-        } else {
+        else                                  /* accept reflection */
             update_point(state, hi, xc, v);
-            dhi = pv;
-        }
-    } else if( !gsl_finite(pv) || ds_hi < pv ) {
-
-        if(gsl_finite(v) && pv <= dhi) {
-			/* ds_h < pv <= dhi */
-            update_point(state, hi, xc, v);
-            dhi = pv;
-        }
-
-		/* ds_hi <= dhi < pv || !finite(pv): try contraction */
-		v2 = trial_point(-alpha*gmma, xc2, &hvec.vector, state->center, f);
-		/* v2 = try_corner_move(0.5, state, hi, xc2, f); */
-        pv2 = v2 - ran_expn(&state->seed, temp);
-
-        if(gsl_finite(v2) && v2 < state->bestEver)
-            state->bestEver = v2;
-
-        if(gsl_finite(pv2) && pv2 <= dhi) {
-            update_point(state, hi, xc2, v2);
-            dhi = pv2;
-        } else {
-            /* contract simplex about the best point */
-            status = contract_by_best(state, delta, lo, xc, f);
-
-            if(status != GSL_SUCCESS) {
-                GSL_ERROR("contraction failed", GSL_EFAILED);
-            }
-        }
-    } else {
-        /*
-         * Trial point is better than second highest point.  Insert it
-         * into the simplex, replacing the current high point. No need
-         * to reset dhi and ds_hi, because we are about to exit the
-         * function.
-         */
+    }else if( pv < ds_hi ) {                  /* accept reflection */
+        assert(dlo <= pv);
         update_point(state, hi, xc, v);
-        dhi = pv;
+    }else  if( pv < dhi ){                    /* try outside contraction */
+        assert(ds_hi <= pv);
+        v2 = trial_point(-alpha*gmma, xc2, &hvec.vector, state->center, f);
+        pv2 = v2 - ran_expn(&state->seed, temp);
+        if(pv2 <= pv)                         /* accept outside contraction */
+            update_point(state, hi, xc2, v2);
+        else                                  /* shrink */
+            status = contract_by_best(state, delta, lo, xc, f);
+    }else{                                    /* try inside contraction */
+        assert(dhi <= pv || !gsl_finite(pv));
+        v2 = trial_point(alpha*gmma, xc2, &hvec.vector, state->center, f);
+        pv2 = v2 - ran_expn(&state->seed, temp);
+        if(pv2 < dhi) {                      /* accept inside contraction */
+            update_point(state, hi, xc2, v2);
+        }else                                 /* shrink */
+            status = contract_by_best(state, delta, lo, xc, f);
     }
 
-    /* return lowest point of simplex as x */
-    lo = gsl_vector_min_index(f1);
+    if(status != GSL_SUCCESS) 
+        GSL_ERROR("contraction failed", GSL_EFAILED);
+
+    /* Return lowest point of simplex as x. */
+    lo = vector_min_index(fvec);
     gsl_matrix_get_row(x, x1, lo);
-    *fval = gsl_vector_get(f1, lo);
+    *fval = gsl_vector_get(fvec, lo);
 
-    /* Update simplex size */
-    {
-        double      S2 = state->S2;
+    if(*fval < state->bestEver)
+        state->bestEver = *fval;
 
-        if(S2 > 0.0) {
-            *size = sqrt(S2);
-        } else {
-            /* recompute if accumulated error has made size invalid */
-            *size = compute_size(state, state->center);
-        }
-    }
+    *size = sasimplex_size(state);
 
 #ifdef DEBUGGING
     fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
             __func__);
 #endif
-    return GSL_SUCCESS;
+    return status;
 }
 
 static int
@@ -967,7 +927,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     v = try_corner_move(-1.0, state, hi, xc, f);
     pv = v - ran_expn(&state->seed, temp);
 
-    if(gsl_finite(v) && v < state->bestEver)
+    if(v < state->bestEver)
         state->bestEver = v;
 
     if(gsl_finite(pv) && pv < dlo) {
@@ -1032,7 +992,7 @@ sasimplex_iterate(void *vstate, gsl_multimin_function * f,
     }
 
     /* return lowest point of simplex as x */
-    lo = gsl_vector_min_index(f1);
+    lo = vector_min_index(f1);
     gsl_matrix_get_row(x, x1, lo);
     *fval = gsl_vector_get(f1, lo);
 
