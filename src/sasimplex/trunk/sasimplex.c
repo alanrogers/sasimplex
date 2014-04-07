@@ -21,11 +21,17 @@
  */
 
 /*
- * 2014-03-12: sasimplex.c and sasimplex.h implement Simplex Simulated
+ * 2014-04-07: sasimplex.c and sasimplex.h implement Simplex Simulated
  *             Annealing, as described in Numerical Recipes, by Press
  *             et al. This implementation does not use code from
  *             Numerical Recipes. It is based on simplex2.c in
- *             version 1.16 of the Gnu Scientific Library.
+ *             version 1.16 of the Gnu Scientific Library, rewritten
+ *             to use the adaptive simplex algorithm described by
+ *             Fuchang Gao and Lixing Han. 2012. "Implementing the
+ *             Nelder-Mead simplex algorithm with adaptive
+ *             parameters",  (Computational Optimization and
+ *             Applications  51(1):259-277, 2012).
+ *
  *             Alan R. Rogers <rogers@anthro.utah.edu>
  *
  ******************************************************************
@@ -765,6 +771,18 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
         }
     }else{                                    /* try inside contraction */
         assert(dhi <= pv || !gsl_finite(pv));
+        /*
+         * According to Gao and Han (3rd page), the inside contraction is
+         *
+         *   center*(1-alpha*gmma)  + alpha*gmma*h
+         *
+         * According to Lagarias et al (eqn 2.7), it is
+         *
+         *   center*(1-gmma)  + gmma*h
+         *
+         * This shouldn't matter, because Gao and Han (eqn 4.1) take
+         * alpha=1.  
+         */
         v2 = trial_point(alpha*gmma, xc2, &hvec.vector, state->center, f);
         pv2 = v2 - ran_expn(&state->seed, temp);
         if(pv2 < dhi) {                      /* accept inside contraction */

@@ -27,6 +27,8 @@ AnnealSched *AnnealSched_alloc(int nT, double initT, double decay) {
         fprintf(stderr, "bad malloc\n");
         exit(1);
     }
+    if(nT == 1)
+        initT = 0.0;
     s->initT = initT;
     s->decay = decay;
     s->nT = nT;
@@ -48,14 +50,13 @@ void AnnealSched_free(AnnealSched * s) {
 double AnnealSched_next(AnnealSched * s) {
     double tmptr = s->T;
 
-    ++s->iT;  
-
-    if(s->iT == s->nT-1) 
-        s->T = 0.0;
-    else if(s->iT == s->nT)
-        s->iT = 0;
-    else
+    if(s->iT < s->nT - 1) {
         s->T *= s->decay;
+        ++s->iT;  
+    }else{
+        s->T = 0.0;
+        s->iT = 0;
+    }
 
     return tmptr;
 }

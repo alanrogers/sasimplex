@@ -34,19 +34,30 @@ int pr_vector(FILE *fp, const char *fmt, const gsl_vector * v) {
  */
 double my_f(const gsl_vector * v, void *params) {
     size_t      i;
-    double      sx=0.0, sf=0.0;
-    double      x;
+#if 0
+    /* for multiple peaks */
+    double      sf=0.0;
     double      f;         /* fractional part of x */
+#endif
+    double      rval, x, sx=0.0;;
     double     *par = (double *) params;
 
     for(i=0; i < v->size; ++i) {
         x = gsl_vector_get(v, i) - par[i];  /* deviation from optimum */
-        f = x - floor(x + 0.5);             /* fractional part of x */
         sx += fabs(x);                      /* summed absolute devs */
+#if 0
+        /* for multiple peaks */
+        f = x - floor(x + 0.5);             /* fractional part of x */
         sf += fabs(f);                      /* summed fractional dev */
+#endif
     }
+    rval = 1.0 + sx;
+#if 0
+    /* for multiple peaks */
+    rval *= 1.0 + sf;
+#endif    
 
-    return (1.0 + sx) * (1.0 + sf);
+    return rval;
 }
 
 #define STATEDIM 2
@@ -59,7 +70,7 @@ int main(void) {
 	const int   verbose = 1;
     unsigned long seed = time(NULL);    /* for random numbers */
 	unsigned    nTries = 20;            /* number of random starts */
-    int         nT  = 10;               /* number of temperatures */
+    int         nT  = 1;               /* number of temperatures */
     int         nPerT = 200;            /* iterations per temperature */
     double      initT = 3.0;            /* initial temperature */
     double      decay = 0.7;
@@ -117,6 +128,7 @@ int main(void) {
 		if(try > 0)
 			sasimplex_randomize_state(s, rotate, loInit, hiInit, ss);
         for(iT=0; iT<nT; ++iT) {  /* iterate over temperatures */
+            /*I think AnnealSched_next should be called at bottom of loop*/
             temperature = AnnealSched_next(sched);
             status = sasimplex_n_iterations(s,
                                             &size,
