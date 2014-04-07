@@ -53,6 +53,8 @@
  * This implementation uses n+1 corner points in the simplex.
  */
 
+#define DEBUGGING
+
 #include "sasimplex.h"
 #include <stdio.h>
 #include <math.h>
@@ -144,9 +146,9 @@ void sasimplex_print(gsl_multimin_fminimizer * minimizer) {
             printf(" %le", gsl_matrix_get(state->x1, i, j));
         printf(": %le\n", gsl_vector_get(state->f1, i));
     }
-    printf("tmptr=%lf\n", state->temperature);
-    printf("bestEver=%lf\n", state->bestEver);
-    printf("count=%lu\n", state->count);
+    printf(" tmptr=%lf\n", state->temperature);
+    printf(" bestEver=%lf\n", state->bestEver);
+    printf(" count=%lu\n", state->count);
 }
 
 /*
@@ -256,20 +258,28 @@ trial_point(const double p,
 	 * where 
 	 *
 	 *      a = (1 + (n+1)*p)/n
+     *
+     * BUG: for a reflection, p=-1. But this leads to trial=h, which
+     * can't be right.  
 	 */
 	double      a = (1.0 + (n+1)*p)/n;
-#if 0
-	printf("%s:%d: p=%lf a=%lf\n",
-		   __FILE__, __LINE__, p, a);
-	fflush(stdout);
-#endif
+
 	/* trial = (1-a)*c + a*h */
 	gsl_vector_memcpy(trial, c);
 	gsl_blas_dscal(1.0-a, trial);
 	gsl_blas_daxpy(a, h, trial);
 
     /* new function value */
-    return GSL_MULTIMIN_FN_EVAL(f, trial);
+    double newval = GSL_MULTIMIN_FN_EVAL(f, trial);
+
+    size_t i;
+	printf("%s:%d:%s: p=%lf a=%lf \n  trial:",
+		   __FILE__, __LINE__, __func__, p, a);
+    for(i=0; i<n; ++i)
+        printf(" %lf", gsl_vector_get(trial, i));
+    printf(": f=%lf\n", newval);
+
+    return newval;
 }
 
 static void
@@ -430,7 +440,7 @@ compute_size(sasimplex_state_t * state, const gsl_vector * center) {
  */
 static int sasimplex_alloc(void *vstate, size_t n) {
 #ifdef DEBUGGING
-    fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
+    printf("%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
 #endif
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
 
@@ -500,7 +510,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     state->bestEver = DBL_MAX;
 
 #ifdef DEBUGGING
-    fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
+    printf("%s:%d: returning from %s\n", __FILE__, __LINE__,
             __func__);
 #endif
     return GSL_SUCCESS;
@@ -508,7 +518,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
 
 static void sasimplex_free(void *vstate) {
 #ifdef DEBUGGING
-    fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
+    printf("%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
 #endif
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
 
@@ -520,7 +530,7 @@ static void sasimplex_free(void *vstate) {
     gsl_vector_free(state->delta);
     gsl_vector_free(state->xmc);
 #ifdef DEBUGGING
-    fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
+    printf("%s:%d: returning from %s\n", __FILE__, __LINE__,
             __func__);
 #endif
 }
@@ -584,7 +594,7 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
               const gsl_vector * x,
               double *size, const gsl_vector * step_size) {
 #ifdef DEBUGGING
-    fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
+    printf("%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
 #endif
     int         status;
     size_t      i;
@@ -636,7 +646,7 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
 
     state->count++;
 #ifdef DEBUGGING
-    fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
+    printf("%s:%d: returning from %s\n", __FILE__, __LINE__,
             __func__);
 #endif
     return GSL_SUCCESS;
@@ -647,7 +657,7 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
                   gsl_vector * x, double *size, double *fval) {
 
 #ifdef DEBUGGING
-    fprintf(stderr, "%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
+    printf("%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
 #endif
     /* Simplex iteration tries to minimize function f value */
     /* Includes corrections from Ivo Alxneit <ivo.alxneit@psi.ch> */
@@ -743,30 +753,25 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
         v2 = trial_point(-alpha*beta, xc2, &hvec.vector, state->center, f);
         pv2 = v2 - ran_expn(&state->seed, temp);
         if(pv2 < pv) {                        /* accept expansion */
-            fflush(stdout);
-            fprintf(stderr, "%s:%d:%s: expansion\n", __FILE__, __LINE__, __func__);
+            printf("%s:%d:%s: expansion\n", __FILE__, __LINE__, __func__);
             update_point(state, hi, xc2, v2);
         }else{                                  /* accept reflection */
-            fflush(stdout);
-            fprintf(stderr, "%s:%d:%s: reflection1\n", __FILE__, __LINE__, __func__);
+            printf("%s:%d:%s: reflection1\n", __FILE__, __LINE__, __func__);
             update_point(state, hi, xc, v);
         }
     }else if( pv < ds_hi ) {                  /* accept reflection */
         assert(dlo <= pv);
-        fflush(stdout);
-        fprintf(stderr, "%s:%d:%s: reflection2\n", __FILE__, __LINE__, __func__);
+        printf("%s:%d:%s: reflection2\n", __FILE__, __LINE__, __func__);
         update_point(state, hi, xc, v);
     }else  if( pv < dhi ){                    /* try outside contraction */
         assert(ds_hi <= pv);
         v2 = trial_point(-alpha*gmma, xc2, &hvec.vector, state->center, f);
         pv2 = v2 - ran_expn(&state->seed, temp);
         if(pv2 <= pv){                         /* accept outside contraction */
-            fflush(stdout);
-            fprintf(stderr, "%s:%d:%s: o contract\n", __FILE__, __LINE__, __func__);
+            printf("%s:%d:%s: o contract\n", __FILE__, __LINE__, __func__);
             update_point(state, hi, xc2, v2);
         }else{                                  /* shrink */
-            fflush(stdout);
-            fprintf(stderr, "%s:%d:%s: shrink1\n", __FILE__, __LINE__, __func__);
+            printf("%s:%d:%s: shrink1\n", __FILE__, __LINE__, __func__);
             status = contract_by_best(state, delta, lo, xc, f);
         }
     }else{                                    /* try inside contraction */
@@ -786,12 +791,10 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
         v2 = trial_point(alpha*gmma, xc2, &hvec.vector, state->center, f);
         pv2 = v2 - ran_expn(&state->seed, temp);
         if(pv2 < dhi) {                      /* accept inside contraction */
-            fflush(stdout);
-            fprintf(stderr, "%s:%d:%s: i contract\n", __FILE__, __LINE__, __func__);
+            printf("%s:%d:%s: i contract\n", __FILE__, __LINE__, __func__);
             update_point(state, hi, xc2, v2);
         }else{                                /* shrink */
-            fflush(stdout);
-            fprintf(stderr, "%s:%d:%s: shrink2\n", __FILE__, __LINE__, __func__);
+            printf("%s:%d:%s: shrink2\n", __FILE__, __LINE__, __func__);
             status = contract_by_best(state, delta, lo, xc, f);
         }
     }
@@ -810,7 +813,7 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
     *size = sasimplex_size(state);
 
 #ifdef DEBUGGING
-    fprintf(stderr, "%s:%d: returning from %s\n", __FILE__, __LINE__,
+    printf("%s:%d: returning from %s\n", __FILE__, __LINE__,
             __func__);
 #endif
     return status;
@@ -954,6 +957,7 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
     }
     do {
         status = gsl_multimin_fminimizer_iterate(minimizer);
+        sasimplex_print(minimizer);
         if(status) {
             printf("%s:%d:%s: rtn val %d from %s\n",
                    __FILE__, __LINE__, __func__,
@@ -969,6 +973,7 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
 #endif
 
         if(verbose) {
+            sasimplex_print(minimizer);
             printf(" %5d %7.3f %8.3f %8.4f %8.4f\n",
                    itr, minimizer->fval, *size,
                    sasimplex_vertical_scale(minimizer),
