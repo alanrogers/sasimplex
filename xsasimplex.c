@@ -34,13 +34,13 @@ int pr_vector(FILE *fp, const char *fmt, const gsl_vector * v) {
  */
 double my_f(const gsl_vector * v, void *params) {
     size_t      i;
+    double      rval, x, sx=0.0;;
+    double     *par = (double *) params;
 #if 0
     /* for multiple peaks */
     double      sf=0.0;
     double      f;         /* fractional part of x */
 #endif
-    double      rval, x, sx=0.0;;
-    double     *par = (double *) params;
 
     for(i=0; i < v->size; ++i) {
         x = gsl_vector_get(v, i) - par[i];  /* deviation from optimum */
@@ -86,14 +86,10 @@ int main(void) {
     /* Set up annealing schedule */
     AnnealSched *sched = AnnealSched_alloc(nT, initT, decay);
 
-    /*
-     * Initial state vector: (0,1,...)
-     * Optimal state vector: (1,1,...)
-     */
     gsl_vector *x = gsl_vector_alloc(STATEDIM);
     for(i = 0; i < STATEDIM; ++i) {
-        par[i] = 1.0;
-        gsl_vector_set(x, i, (double) i);
+        par[i] = 0.0;                      /* optimal value */
+        gsl_vector_set(x, i, (double) i);  /* initial value */
     }
 
 	/* for random restarts */
