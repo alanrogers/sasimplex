@@ -36,7 +36,7 @@ double my_f(const gsl_vector * v, void *params) {
     size_t      i;
     double      rval, x, sx=0.0;;
     double     *par = (double *) params;
-#if 0
+#if 1
     /* for multiple peaks */
     double      sf=0.0;
     double      f;         /* fractional part of x */
@@ -45,14 +45,14 @@ double my_f(const gsl_vector * v, void *params) {
     for(i=0; i < v->size; ++i) {
         x = gsl_vector_get(v, i) - par[i];  /* deviation from optimum */
         sx += fabs(x);                      /* summed absolute devs */
-#if 0
+#if 1
         /* for multiple peaks */
         f = x - floor(x + 0.5);             /* fractional part of x */
         sf += fabs(f);                      /* summed fractional dev */
 #endif
     }
     rval = 1.0 + sx;
-#if 0
+#if 1
     /* for multiple peaks */
     rval *= 1.0 + sf;
 #endif    
