@@ -245,7 +245,7 @@ trial_point(const double p,
 	/*
 	 * We want to calculate a trial vertex as
 	 *
-	 *    trial = (1-p)*m + p*h = m + p*(m - h)
+	 *    trial = (1-p)*m + p*h = m - p*(m - h)
 	 *
 	 * where h is the vector defining the simplex point with
 	 * highest function value and m is the centroid of the
@@ -253,16 +253,13 @@ trial_point(const double p,
 	 * the center of the entire simplex, not excluding the highest
 	 * point. The formula above for "trial" is equivalent to
 	 *
-	 *    trial = (1-a)*c + a*h = c + a*(c - h)
+	 *    trial = (1-a)*c + a*h = c - a*(c - h)
 	 *
 	 * where 
 	 *
-	 *      a = (1 + (n+1)*p)/n
-     *
-     * BUG: for a reflection, p=-1. But this leads to trial=h, which
-     * can't be right.  
+	 *      a = ((n+1)*p - 1)/n
 	 */
-	double      a = (1.0 + (n+1)*p)/n;
+	double      a = ((n+1)*p - 1.0)/n;
 
 	/* trial = (1-a)*c + a*h */
 	gsl_vector_memcpy(trial, c);
