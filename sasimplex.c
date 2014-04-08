@@ -202,6 +202,7 @@ sasimplex_converged(gsl_multimin_fminimizer * minimizer, double ftol) {
     sasimplex_state_t *state = minimizer->state;
 
     double best, worst, dy, tol1;
+    unsigned status=0;
 
 #if 0
     gsl_vector_minmax(state->f1, &best, &worst);
@@ -213,6 +214,13 @@ sasimplex_converged(gsl_multimin_fminimizer * minimizer, double ftol) {
     /* convergence criteria from zeroin */
     tol1 = 4.0 * ftol * (fabs(worst) + fabs(best)) + ftol;
     dy = fabs(worst - best);
+
+    /* experimental code */
+    enum {SAME_FVALS=1, TINY_SIMPLEX=2};
+    if( dy < tol1)
+        status |= SAME_FVALS;
+    if( sasimplex_size(state) < tol2 )
+        status |= TINY_SIMPLEX;
 
     return ( dy < tol1 ? GSL_SUCCESS : GSL_CONTINUE );
 }
