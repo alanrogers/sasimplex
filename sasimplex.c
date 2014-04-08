@@ -216,11 +216,25 @@ sasimplex_converged(gsl_multimin_fminimizer * minimizer, double ftol) {
     dy = fabs(worst - best);
 
     /* experimental code */
-    enum {SAME_FVALS=1, TINY_SIMPLEX=2};
+    unsigned fvals_eq = 0, tiny_simplex = 0;
     if( dy < tol1)
-        status |= SAME_FVALS;
+        fvals_eq = 1;
     if( sasimplex_size(state) < tol2 )
-        status |= TINY_SIMPLEX;
+        tiny_simplex = 1;
+    if(fvals_eq) {
+        if(tiny_simplex) {
+            return GSL_SUCCESS;
+        }else{
+            /* flat objective function */
+        }
+    }else{
+        if(tiny_simplex){
+            /* stuck: restart w/ larger simplex */
+        }else{
+            /* keep going */
+            return GSL_CONTINUE;
+        }
+    }
 
     return ( dy < tol1 ? GSL_SUCCESS : GSL_CONTINUE );
 }
