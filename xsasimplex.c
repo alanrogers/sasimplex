@@ -32,11 +32,12 @@ int pr_vector(FILE *fp, const char *fmt, const gsl_vector * v) {
  * Local minima wherever all entries of v-par are integers. Global
  * minimum at v=par.
  */
+#define RUGGED
 double my_f(const gsl_vector * v, void *params) {
     size_t      i;
     double      rval, x, sx=0.0;;
     double     *par = (double *) params;
-#if 1
+#ifdef RUGGED
     /* for multiple peaks */
     double      sf=0.0;
     double      f;         /* fractional part of x */
@@ -45,32 +46,34 @@ double my_f(const gsl_vector * v, void *params) {
     for(i=0; i < v->size; ++i) {
         x = gsl_vector_get(v, i) - par[i];  /* deviation from optimum */
         sx += fabs(x);                      /* summed absolute devs */
-#if 1
+#ifdef RUGGED
         /* for multiple peaks */
         f = x - floor(x + 0.5);             /* fractional part of x */
         sf += fabs(f);                      /* summed fractional dev */
 #endif
     }
     rval = 1.0 + sx;
-#if 1
+#ifdef RUGGED
     /* for multiple peaks */
     rval *= 1.0 + sf;
 #endif    
 
     return rval;
 }
+#undef RUGGED
 
 #define STATEDIM 2
 
 int main(void) {
     double      par[STATEDIM];         /* minumum */
-    const double tol = 1e-4;
+    const double tol_fval = 1e-4;
+    const double tol_size = 1e-4;
     double      initStepSize = 0.05;
     const int   rotate = 1;             /* random rotation of init simplex?*/
 	const int   verbose = 1;
     unsigned long seed = time(NULL);    /* for random numbers */
 	unsigned    nTries = 20;            /* number of random starts */
-    int         nT  = 1;               /* number of temperatures */
+    int         nT  = 5;               /* number of temperatures */
     int         nPerT = 200;            /* iterations per temperature */
     double      initT = 3.0;            /* initial temperature */
     double      decay = 0.7;
@@ -128,7 +131,8 @@ int main(void) {
             temperature = AnnealSched_next(sched);
             status = sasimplex_n_iterations(s,
                                             &size,
-                                            tol,
+                                            tol_fval,
+                                            tol_size,
                                             nPerT,
                                             temperature,
                                             verbose);
