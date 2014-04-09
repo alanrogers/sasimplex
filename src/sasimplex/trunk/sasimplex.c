@@ -203,7 +203,7 @@ sasimplex_converged(gsl_multimin_fminimizer * minimizer, double tol_fval,
     sasimplex_state_t *state = minimizer->state;
 
     double best, worst, dy, tol1;
-    int status=0;
+    int status=GSL_ESANITY;
 
 #if 0
     gsl_vector_minmax(state->f1, &best, &worst);
@@ -216,29 +216,26 @@ sasimplex_converged(gsl_multimin_fminimizer * minimizer, double tol_fval,
     tol1 = 4.0 * tol_fval * (fabs(worst) + fabs(best)) + tol_fval;
     dy = fabs(worst - best);
 
-    /* experimental code */
-    unsigned fvals_eq = 0, tiny_simplex = 0;
-    if( dy < tol1)
-        fvals_eq = 1;
-    if( sasimplex_size(state) < tol_size )
-        tiny_simplex = 1;
-    if(fvals_eq) {
-        if(tiny_simplex) {
+    int fvals_eq = (dy < tol1 ? 1 : 0);
+
+    if( sasimplex_size(state) < tol_size ){
+        if(fvals_eq) {
             status =  GSL_SUCCESS;
         }else{
-            /* flat objective function */
-            /* do what ? */
-            status = GSL_CONTINUE;
+            /* stuck */
+            status =  GSL_ETOLF;
         }
     }else{
-        if(tiny_simplex){
-            /* stuck */
-            status =  GSL_ENOPROG;
+        if(fvals_eq) {
+            /* flat objective function */
+            status = GSL_ETOLX;
         }else{
             /* keep going */
             status = GSL_CONTINUE;
         }
     }
+
+    assert(status != GSL_ESANITY);
 
     return status;
 }
@@ -647,9 +644,9 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
     /* following points are initialized to x0 + step_size */
     for(i = 0; i < x->size; i++) {
         status = gsl_vector_memcpy(xtemp, x);
-        if(status != 0) {
+        if(status != 0) 
             GSL_ERROR("vector memcopy failed", GSL_EFAILED);
-        }
+
         {
             double      xi = gsl_vector_get(x, i);
             double      si = gsl_vector_get(step_size, i);
@@ -658,6 +655,7 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
             val = GSL_MULTIMIN_FN_EVAL(f, xtemp);
         }
         if(!gsl_finite(val)) {
+            GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
         }
         gsl_matrix_set_row(state->x1, i + 1, xtemp);
         gsl_vector_set(state->f1, i + 1, val);
@@ -983,7 +981,8 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
  */
 int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
                            double *size,
-                           double tol,
+                           double tol_fval,
+                           double tol_size,
                            int nItr,
                            double temperature,
                            int verbose) {
@@ -991,8 +990,8 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
 
     sasimplex_set_temp(minimizer, temperature);
     if(verbose) {
-        printf(" %5s %7s %8s %8s %8s\n",
-               "itr", "fval", "size", "vscale", "tmptr");
+        printf(" %5s %7s %8s %8s %8s %4s\n",
+               "itr", "fval", "size", "vscale", "tmptr", "stat");
     }
     do {
         status = gsl_multimin_fminimizer_iterate(minimizer);
@@ -1005,16 +1004,36 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
 
         *size = gsl_multimin_fminimizer_size(minimizer);
 #if 0
-        status = gsl_multimin_test_size(*size, tol);
+        status = gsl_multimin_test_size(*size, tol_size);
 #else
-        status = sasimplex_converged(minimizer, tol);
+        status = sasimplex_converged(minimizer, tol_fval, tol_size);
+        switch(status) {
+        case GSL_SUCCESS:
+            break;
+        case GSL_ETOLX:
+            /* flat objective function */
+            status = GSL_CONTINUE;
+            break;
+        case GSL_ETOLF:
+            /* stuck */
+            status = GSL_CONTINUE;
+            break;
+        case GSL_CONTINUE:
+            break;
+        default:
+            fprintf(stderr,
+                    "%s:%d:%s: illegal status: %d\n",
+                    __FILE__, __LINE__, __func__, status);
+            GSL_ERROR("ILLEGAL STATUS", GSL_EFAILED);
+        }
+               
 #endif
 
         if(verbose) {
-            printf(" %5d %7.3f %8.3f %8.4f %8.4f\n",
+            printf(" %5d %7.3f %8.3f %8.4f %8.4f %4d\n",
                    itr, minimizer->fval, *size,
                    sasimplex_vertical_scale(minimizer),
-                   temperature);
+                   temperature, status);
         }
         ++itr;
     }while(status == GSL_CONTINUE && itr < nItr);
