@@ -19,6 +19,8 @@ int         sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
                            double *size, double tol, int nItr,
                            double temperature, int verbose);
 int         sasimplex_converged(gsl_multimin_fminimizer * minimizer,
+                                double tol_fval, double tol_size);
+int         sasimplex_converged(gsl_multimin_fminimizer * minimizer,
                                 double ftol);
 void        sasimplex_print(gsl_multimin_fminimizer * minimizer);
 

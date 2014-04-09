@@ -198,11 +198,12 @@ sasimplex_set_temp(gsl_multimin_fminimizer * minimizer, double temperature) {
 
 /** Test convergence based on relative spread of function values */
 int
-sasimplex_converged(gsl_multimin_fminimizer * minimizer, double ftol) {
+sasimplex_converged(gsl_multimin_fminimizer * minimizer, double tol_fval,
+                    double tol_size) {
     sasimplex_state_t *state = minimizer->state;
 
     double best, worst, dy, tol1;
-    unsigned status=0;
+    int status=0;
 
 #if 0
     gsl_vector_minmax(state->f1, &best, &worst);
@@ -212,31 +213,34 @@ sasimplex_converged(gsl_multimin_fminimizer * minimizer, double ftol) {
 #endif
     assert(worst >= best);
     /* convergence criteria from zeroin */
-    tol1 = 4.0 * ftol * (fabs(worst) + fabs(best)) + ftol;
+    tol1 = 4.0 * tol_fval * (fabs(worst) + fabs(best)) + tol_fval;
     dy = fabs(worst - best);
 
     /* experimental code */
     unsigned fvals_eq = 0, tiny_simplex = 0;
     if( dy < tol1)
         fvals_eq = 1;
-    if( sasimplex_size(state) < tol2 )
+    if( sasimplex_size(state) < tol_size )
         tiny_simplex = 1;
     if(fvals_eq) {
         if(tiny_simplex) {
-            return GSL_SUCCESS;
+            status =  GSL_SUCCESS;
         }else{
             /* flat objective function */
+            /* do what ? */
+            status = GSL_CONTINUE;
         }
     }else{
         if(tiny_simplex){
-            /* stuck: restart w/ larger simplex */
+            /* stuck */
+            status =  GSL_ENOPROG;
         }else{
             /* keep going */
-            return GSL_CONTINUE;
+            status = GSL_CONTINUE;
         }
     }
 
-    return ( dy < tol1 ? GSL_SUCCESS : GSL_CONTINUE );
+    return status;
 }
 
 /*
