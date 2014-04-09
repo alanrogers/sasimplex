@@ -99,11 +99,11 @@ int main(void) {
 	gsl_vector_set_all(hiInit, 2.0 * STATEDIM);
 
     /* Initialize method and iterate */
-    gsl_multimin_function minex_func;
-
-    minex_func.n = STATEDIM;
-    minex_func.f = my_f;
-    minex_func.params = par;
+    gsl_multimin_function minex_func = {
+        .n = STATEDIM,
+        .f = my_f,
+        .params = par
+    };
 
     const gsl_multimin_fminimizer_type *fmType 
         = gsl_multimin_fminimizer_sasimplex;
