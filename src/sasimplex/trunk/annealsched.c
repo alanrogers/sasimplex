@@ -50,13 +50,11 @@ void AnnealSched_free(AnnealSched * s) {
 double AnnealSched_next(AnnealSched * s) {
     double tmptr = s->T;
 
-    if(s->iT < s->nT - 1) {
-        s->T *= s->decay;
-        ++s->iT;  
-    }else{
+    ++s->iT;
+    if(s->iT == s->nT-1) 
         s->T = 0.0;
-        s->iT = 0;
-    }
+    else
+        s->T *= s->decay;
 
     return tmptr;
 }
