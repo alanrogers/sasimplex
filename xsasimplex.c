@@ -70,7 +70,7 @@ int main(void) {
     const double tol_size = 1e-4;
     double      initStepSize = 0.05;
     const int   rotate = 1;             /* random rotation of init simplex?*/
-	const int   verbose = 1;
+	const int   verbose = 0;
     unsigned long seed = time(NULL);    /* for random numbers */
 	unsigned    nTries = 20;            /* number of random starts */
     int         nT  = 5;               /* number of temperatures */
@@ -127,7 +127,6 @@ int main(void) {
 		if(try > 0)
 			sasimplex_randomize_state(s, rotate, loInit, hiInit, ss);
         for(iT=0; iT<nT; ++iT) {  /* iterate over temperatures */
-            /*I think AnnealSched_next should be called at bottom of loop*/
             temperature = AnnealSched_next(sched);
             status = sasimplex_n_iterations(s,
                                             &size,
