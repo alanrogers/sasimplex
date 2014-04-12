@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <assert.h>
 #include <gsl/gsl_multimin.h>
 
 double      my_f(const gsl_vector * v, void *params);
@@ -88,6 +89,13 @@ int main(void) {
 
     /* Set up annealing schedule */
     AnnealSched *sched = AnnealSched_alloc(nT, initT, decay);
+
+    /* Test AnnealSched */
+    AnnealSched *sched2 = AnnealSched_copy(sched);
+    assert(AnnealSched_cmp(sched, sched2) == 0);
+    assert(AnnealSched_size(sched2) == nT);
+    AnnealSched_free(sched2);
+    sched2=NULL;
 
     gsl_vector *x = gsl_vector_alloc(STATEDIM);
     for(i = 0; i < STATEDIM; ++i) {

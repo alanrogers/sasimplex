@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <assert.h>
 #include "annealsched.h"
 
 /**
@@ -36,6 +39,11 @@ AnnealSched *AnnealSched_alloc(int nT, double initT, double decay) {
 	return s;
 }
 
+/** Return number of temperature values */
+int AnnealSched_size(const AnnealSched *sched) {
+    return sched->nT;
+}
+
 void AnnealSched_reset(AnnealSched *s) {
     s->iT = 0;             /* range: 0..(nT-1) */
     s->T = s->initT;
@@ -44,6 +52,23 @@ void AnnealSched_reset(AnnealSched *s) {
 /** Free memory allocated for annealing schedule */
 void AnnealSched_free(AnnealSched * s) {
     free(s);
+}
+
+AnnealSched * AnnealSched_copy(const AnnealSched *old) {
+    AnnealSched *new = malloc(sizeof(*new));
+    if(new == NULL) {
+        fprintf(stderr,"%s%d%s: bad malloc\n",
+                __FILE__,__LINE__,__func__);
+        exit(ENOMEM);
+    }
+    assert(sizeof(*old) == sizeof(*new));
+    memcpy(new, old, sizeof(*new));
+    return new;
+}
+
+int AnnealSched_cmp(const AnnealSched *s1, const AnnealSched *s2) {
+    return memcmp( (const void *) s1, (const void *) s2,
+                   sizeof(AnnealSched));
 }
 
 /** Get next temperature */
