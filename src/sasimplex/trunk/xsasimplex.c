@@ -116,13 +116,15 @@ int main(void) {
         .params = par
     };
 
-    const gsl_multimin_fminimizer_type *fmType 
-        = gsl_multimin_fminimizer_sasimplex;
-    gsl_multimin_fminimizer *minimizer 
-        = gsl_multimin_fminimizer_alloc(fmType, STATEDIM);
-    if(minimizer == NULL) {
-        fprintf(stderr, "%s:%d: bad allocation\n", __FILE__, __LINE__);
-        exit(1);
+    gsl_multimin_fminimizer *minimizer;
+    {
+        const gsl_multimin_fminimizer_type *fmType 
+            = gsl_multimin_fminimizer_sasimplex;
+        minimizer = gsl_multimin_fminimizer_alloc(fmType, STATEDIM);
+        if(minimizer == NULL) {
+            fprintf(stderr, "%s:%d: bad allocation\n", __FILE__, __LINE__);
+            exit(1);
+        }
     }
 
     gsl_multimin_fminimizer_set(minimizer, &minex_func, x, ss);
