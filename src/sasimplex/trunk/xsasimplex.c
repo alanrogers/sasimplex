@@ -161,7 +161,7 @@ int main(void) {
             printf("%2d: size=%.4le aberr=%.4le vscale=%.4lf x=",
                    try, size, absErr,
                    sasimplex_vertical_scale(minimizer));
-            pr_vector(stdout, "%.4lf", minimizer->x);
+            pr_vector(stdout, "%+7.4lf", minimizer->x);
         }
 		switch (status) {
 		case GSL_SUCCESS:
