@@ -118,25 +118,25 @@ int main(void) {
 
     const gsl_multimin_fminimizer_type *fmType 
         = gsl_multimin_fminimizer_sasimplex;
-    gsl_multimin_fminimizer *s 
+    gsl_multimin_fminimizer *minimizer 
         = gsl_multimin_fminimizer_alloc(fmType, STATEDIM);
-    if(s == NULL) {
+    if(minimizer == NULL) {
         fprintf(stderr, "%s:%d: bad allocation\n", __FILE__, __LINE__);
         exit(1);
     }
 
-    gsl_multimin_fminimizer_set(s, &minex_func, x, ss);
-    sasimplex_random_seed(s, seed);
+    gsl_multimin_fminimizer_set(minimizer, &minex_func, x, ss);
+    sasimplex_random_seed(minimizer, seed);
 
-    printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(s));
+    printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(minimizer));
 	for(try=0; try < nTries; ++try) {
         int iT = 0;  /* index of current temperature */
 		AnnealSched_reset(sched);
 		if(try > 0)
-			sasimplex_randomize_state(s, rotate, loInit, hiInit, ss);
+			sasimplex_randomize_state(minimizer, rotate, loInit, hiInit, ss);
         for(iT=0; iT<nT; ++iT) {  /* iterate over temperatures */
             temperature = AnnealSched_next(sched);
-            status = sasimplex_n_iterations(s,
+            status = sasimplex_n_iterations(minimizer,
                                             &size,
                                             tol_fval,
                                             tol_size,
@@ -145,14 +145,14 @@ int main(void) {
                                             verbose);
 
             /* absErr is summed absolute error */
-            double      errx = gsl_vector_get(s->x, 0) - par[0];
-            double      erry = gsl_vector_get(s->x, 1) - par[1];
+            double      errx = gsl_vector_get(minimizer->x, 0) - par[0];
+            double      erry = gsl_vector_get(minimizer->x, 1) - par[1];
             absErr = fabs(errx) + fabs(erry);
 
             if(verbose) {
                 printf("try=%d x=%.4lf y=%.4f abserr=%.4le\n",
-                       try, gsl_vector_get(s->x, 0),
-                       gsl_vector_get(s->x, 1), absErr);
+                       try, gsl_vector_get(minimizer->x, 0),
+                       gsl_vector_get(minimizer->x, 1), absErr);
             }
             if(status != GSL_CONTINUE)
                 break;
@@ -160,8 +160,8 @@ int main(void) {
         if(!verbose) {
             printf("%2d: size=%.4le aberr=%.4le vscale=%.4lf x=",
                    try, size, absErr,
-                   sasimplex_vertical_scale(s));
-            pr_vector(stdout, "%.4lf", s->x);
+                   sasimplex_vertical_scale(minimizer));
+            pr_vector(stdout, "%.4lf", minimizer->x);
         }
 		switch (status) {
 		case GSL_SUCCESS:
@@ -170,7 +170,7 @@ int main(void) {
         case GSL_CONTINUE:
 			printf(" no convergence in %d iterations at tmptr %lf\n",
                    nPerT, temperature);
-            sasimplex_print(s);
+            sasimplex_print(minimizer);
 			break;
 		default:
 			printf(" unknown status: %d\n", status);
@@ -180,7 +180,7 @@ int main(void) {
 	printf("True minimum: (%lf, %lf)\n", par[0], par[1]);
     gsl_vector_free(x);
     gsl_vector_free(ss);
-    gsl_multimin_fminimizer_free(s);
+    gsl_multimin_fminimizer_free(minimizer);
 
     return status;
     }
