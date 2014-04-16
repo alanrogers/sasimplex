@@ -98,9 +98,13 @@ int main(void) {
     sched2=NULL;
 
     gsl_vector *x = gsl_vector_alloc(STATEDIM);
+    gsl_vector *lbound = gsl_vector_alloc(STATEDIM);
+    gsl_vector *ubound = gsl_vector_alloc(STATEDIM);
     for(i = 0; i < STATEDIM; ++i) {
         par[i] = 0.0;                      /* optimal value */
         gsl_vector_set(x, i, (double) i);  /* initial value */
+        gsl_vector_set(lbound, i, 1.0);  /* lower bound */
+        gsl_vector_set(ubound, i, 10.0);   /* upper bound */
     }
 
 	/* for random restarts */
@@ -129,6 +133,7 @@ int main(void) {
 
     gsl_multimin_fminimizer_set(minimizer, &minex_func, x, ss);
     sasimplex_random_seed(minimizer, seed);
+    sasimplex_set_bounds(minimizer, lbound, ubound);
 
     printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(minimizer));
 	for(try=0; try < nTries; ++try) {
