@@ -996,9 +996,10 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
     do {
         status = gsl_multimin_fminimizer_iterate(minimizer);
         if(status) {
-            printf("%s:%d:%s: rtn val %d from %s\n",
+            printf("%s:%d:%s: %s returned %d: %s\n",
                    __FILE__, __LINE__, __func__,
-                   status, "gsl_multimin_fminimizer_iterate");
+                   "gsl_multimin_fminimizer_iterate",
+                   status, gsl_strerror(status));
             break;
         }
 
