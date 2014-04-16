@@ -71,7 +71,7 @@ int main(void) {
     const double tol_size = 1e-4;
     double      initStepSize = 0.05;
     const int   rotate = 1;             /* random rotation of init simplex?*/
-	const int   verbose = 0;
+	const int   verbose = 1;
     unsigned long seed = time(NULL);    /* for random numbers */
 	unsigned    nTries = 20;            /* number of random starts */
     int         nT  = 5;               /* number of temperatures */
