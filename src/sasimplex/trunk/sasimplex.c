@@ -102,6 +102,10 @@ static int  sasimplex_set(void *vstate, gsl_multimin_function * f,
 static int  sasimplex_onestep(void *vstate, gsl_multimin_function * f,
 							  gsl_vector * x, double *size, double *fval);
 static size_t vector_min_index(const gsl_vector *v);
+static int  sasimplex_set_other_points(sasimplex_state_t *state,
+                                       gsl_multimin_function * f,
+                                       double *size,
+                                       const gsl_vector * step_size);
 static inline double sasimplex_size(sasimplex_state_t *state);
 static inline double obey_constraint(double x, double lo, double hi);
 
@@ -641,7 +645,8 @@ int sasimplex_set_bounds(gsl_multimin_fminimizer * minimizer,
 
     gsl_vector_memcpy(state->lbound, lbound);
     gsl_vector_memcpy(state->ubound, ubound);
-    return 0;
+
+    return sasimplex_set_other_points(state, f, size, step_size);
 }
 
 /**
@@ -698,59 +703,35 @@ double sasimplex_vertical_scale(gsl_multimin_fminimizer *minimizer) {
 }
 
 static int
-sasimplex_set(void *vstate, gsl_multimin_function * f,
-              const gsl_vector * x,
-              double *size, const gsl_vector * step_size) {
-#ifdef DEBUGGING
-    printf("%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
-#endif
+sasimplex_set_other_points(sasimplex_state_t *state,
+                           gsl_multimin_function * f,
+                           double *size, const gsl_vector * step_size) {
     int         status;
     size_t      i;
-    double      val;
-    sasimplex_state_t *state = (sasimplex_state_t *) vstate;
     gsl_vector *xtemp = state->ws1;
-
-    if(xtemp->size != x->size) {
-        GSL_ERROR("incompatible size of x", GSL_EINVAL);
-    }
-
-    if(xtemp->size != step_size->size) {
-        GSL_ERROR("incompatible size of step_size", GSL_EINVAL);
-    }
-
-    /* first point is the original x0 */
-    val = GSL_MULTIMIN_FN_EVAL(f, x);
-    if(!gsl_finite(val)) {
-        GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
-    }
-
-    gsl_matrix_set_row(state->x1, 0, x);
-    gsl_vector_set(state->f1, 0, val);
+    gsl_vector_view x = gsl_matrix_row(state->x1, 0);
+    double      val;
 
     /* following points are initialized to x0 + step_size */
-    for(i = 0; i < x->size; i++) {
-        status = gsl_vector_memcpy(xtemp, x);
+    for(i = 0; i < x.vector.size; i++) {
+        status = gsl_vector_memcpy(xtemp, &x.vector);
         if(status != 0) 
-            GSL_ERROR("vector memcopy failed", GSL_EFAILED);
+            GSL_ERROR("gsl_vector_memcpy failed", GSL_EFAILED);
 
         {
-            double      xi = gsl_vector_get(x, i);
+            double      xi = gsl_vector_get(&x.vector, i);
             double      si = gsl_vector_get(step_size, i);
 
             gsl_vector_set(xtemp, i, xi + si);
             val = GSL_MULTIMIN_FN_EVAL(f, xtemp);
         }
-        if(!gsl_finite(val)) {
+        if(!gsl_finite(val)) 
             GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
-        }
         gsl_matrix_set_row(state->x1, i + 1, xtemp);
         gsl_vector_set(state->f1, i + 1, val);
     }
     compute_center(state, state->center);
-
-    /* Initialize simplex size */
     *size = compute_size(state, state->center);
-
     state->bestEver = gsl_vector_min(state->f1);
     state->count++;
 #ifdef DEBUGGING
@@ -758,6 +739,34 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
             __func__);
 #endif
     return GSL_SUCCESS;
+}
+
+static int
+sasimplex_set(void *vstate, gsl_multimin_function * f,
+              const gsl_vector * x,
+              double *size, const gsl_vector * step_size) {
+#ifdef DEBUGGING
+    printf("%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
+#endif
+    double      val;
+    sasimplex_state_t *state = (sasimplex_state_t *) vstate;
+    gsl_vector *xtemp = state->ws1;
+
+    if(xtemp->size != x->size) 
+        GSL_ERROR("incompatible size of x", GSL_EINVAL);
+
+    if(xtemp->size != step_size->size) 
+        GSL_ERROR("incompatible size of step_size", GSL_EINVAL);
+
+    /* first point is the original x0 */
+    val = GSL_MULTIMIN_FN_EVAL(f, x);
+    if(!gsl_finite(val)) 
+        GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
+
+    gsl_matrix_set_row(state->x1, 0, x);
+    gsl_vector_set(state->f1, 0, val);
+
+    return sasimplex_set_other_points(state, f, size, step_size);
 }
 
 static int
