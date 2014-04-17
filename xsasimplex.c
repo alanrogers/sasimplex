@@ -84,8 +84,8 @@ int main(void) {
     double      size, absErr, temperature;
 
     /* Set initial step sizes to initStepSize */
-    gsl_vector *ss = gsl_vector_alloc(STATEDIM);
-    gsl_vector_set_all(ss, initStepSize);
+    gsl_vector *step_size = gsl_vector_alloc(STATEDIM);
+    gsl_vector_set_all(step_size, initStepSize);
 
     /* Set up annealing schedule */
     AnnealSched *sched = AnnealSched_alloc(nT, initT, decay);
@@ -131,16 +131,16 @@ int main(void) {
         }
     }
 
-    gsl_multimin_fminimizer_set(minimizer, &minex_func, x, ss);
+    gsl_multimin_fminimizer_set(minimizer, &minex_func, x, step_size);
     sasimplex_random_seed(minimizer, seed);
-    sasimplex_set_bounds(minimizer, lbound, ubound);
+    sasimplex_set_bounds(minimizer, lbound, ubound, step_size);
 
     printf("Using minimizer %s.\n", gsl_multimin_fminimizer_name(minimizer));
 	for(try=0; try < nTries; ++try) {
         int iT = 0;  /* index of current temperature */
 		AnnealSched_reset(sched);
 		if(try > 0)
-			sasimplex_randomize_state(minimizer, rotate, loInit, hiInit, ss);
+			sasimplex_randomize_state(minimizer, rotate, loInit, hiInit, step_size);
         for(iT=0; iT<nT; ++iT) {  /* iterate over temperatures */
             temperature = AnnealSched_next(sched);
             status = sasimplex_n_iterations(minimizer,
@@ -186,7 +186,7 @@ int main(void) {
 
 	printf("True minimum: (%lf, %lf)\n", par[0], par[1]);
     gsl_vector_free(x);
-    gsl_vector_free(ss);
+    gsl_vector_free(step_size);
     gsl_multimin_fminimizer_free(minimizer);
 
     return status;
