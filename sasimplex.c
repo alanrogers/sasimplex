@@ -88,7 +88,6 @@ typedef struct sasimplex_state_t sasimplex_state_t;
 
 static inline double ran_uni(unsigned *seed);
 static inline double ran_expn(unsigned *seed, double mean);
-static inline int Dbl_near(double x, double y);
 static double trial_point(const double p,
                           gsl_vector *trial,
                           const gsl_vector *h,
@@ -113,10 +112,6 @@ static int  sasimplex_set(void *vstate, gsl_multimin_function * f,
 static int  sasimplex_onestep(void *vstate, gsl_multimin_function * f,
 							  gsl_vector * x, double *size, double *fval);
 static size_t vector_min_index(const gsl_vector *v);
-static int  sasimplex_set_other_points(sasimplex_state_t *state,
-                                       gsl_multimin_function * f,
-                                       double *size,
-                                       const gsl_vector * step_size);
 static inline double sasimplex_size(sasimplex_state_t *state);
 static inline double obey_constraint(double x, double lo, double hi);
 static void vector_obey_constraint(gsl_vector *v, const gsl_vector *lbound,
@@ -157,14 +152,6 @@ static const gsl_multimin_fminimizer_type sasimplex_type = {
 const       gsl_multimin_fminimizer_type
     * gsl_multimin_fminimizer_sasimplex = &sasimplex_type;
 
-/**
- * Return 1 if the relative difference between x and y is less than or
- * equal to DBL_EPSILON.
- */
-static inline int Dbl_near(double x, double y) {
-    return fabs(x - y) <= fmax(fabs(x), fabs(y)) * DBL_EPSILON;
-}
-
 static void dostacktrace(const char *file, int line, const char *func,
 						 FILE * ofp) {
 	enum {CALLSTACK_SIZE=128};
@@ -193,7 +180,7 @@ static void sasimplex_sanityCheck(const sasimplex_state_t *state,
 			file, lineno, func);
 
 	size_t i, j;
-	size_t n = state->f1->size;
+	size_t n = state->center->size;
 	REQUIRE(n>0, file, lineno, func);
 
 	if(state->lbound != NULL) {
@@ -205,6 +192,11 @@ static void sasimplex_sanityCheck(const sasimplex_state_t *state,
                 lb = gsl_vector_get(state->lbound, j);
                 ub = gsl_vector_get(state->ubound, j);
 				x  = gsl_vector_get(&row.vector, j);
+                if(lb > x || ub < x) {
+                    printf("%s:%d:%s: x[%d]=%lf not in [%lf, %lf]\n",
+                           __FILE__,__LINE__,__func__,
+                           j, x,lb,ub);
+                }
 				REQUIRE(lb <= x, file, lineno, func);
 				REQUIRE(x <= ub, file, lineno, func);
 			}
@@ -225,7 +217,8 @@ static void sasimplex_sanityCheck(const sasimplex_state_t *state,
 	for(j=0; j < n; ++j) {
 		double x = gsl_vector_get(state->ws1, j);
 		double y = gsl_vector_get(state->center, j);
-		REQUIRE(Dbl_near(x,y), file, lineno, func);
+		REQUIRE(fabs(x - y) <= fmax(fabs(x), fabs(y)) * 100*DBL_EPSILON,
+                file, lineno, func);
 	}
 #endif
 }
@@ -502,6 +495,7 @@ update_point(sasimplex_state_t * state, size_t i,
 
     gsl_matrix_set_row(state->x1, i, x);
     gsl_vector_set(state->f1, i, val);
+	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
 }
 
 /*
@@ -554,6 +548,7 @@ contract_by_best(sasimplex_state_t * state, double delta,
     compute_center(state, state->center);
     compute_size(state, state->center);
 
+	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
     return status;
 }
 
@@ -578,10 +573,8 @@ compute_center(const sasimplex_state_t * state, gsl_vector * center) {
         gsl_vector_const_view row = gsl_matrix_const_row(x1, i);
         gsl_blas_daxpy(1.0, &row.vector, center);
     }
-    {
-        const double alpha = 1.0 / P;
-        gsl_blas_dscal(alpha, center);
-    }
+    gsl_blas_dscal(1.0/P, center);
+	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
     return GSL_SUCCESS;
 }
 
@@ -636,7 +629,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
         GSL_ERROR("invalid number of parameters specified", GSL_EINVAL);
     }
 
-    state->x1 = gsl_matrix_alloc(n + 1, n);
+    state->x1 = gsl_matrix_alloc(n+1, n);
     if(state->x1 == NULL) {
         GSL_ERROR("failed to allocate space for x1", GSL_ENOMEM);
     }
@@ -765,6 +758,7 @@ int sasimplex_set_bounds(gsl_multimin_fminimizer * minimizer,
     printf("%s:%d:%s: bestEver=%lf\n",
            __FILE__, __LINE__, __func__, state->bestEver);
 
+	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
     printf("%s:%d: exit %s\n", __FILE__, __LINE__, __func__);
     return 0;
 }
@@ -823,19 +817,45 @@ double sasimplex_vertical_scale(gsl_multimin_fminimizer *minimizer) {
 }
 
 static int
-sasimplex_set_other_points(sasimplex_state_t *state,
-                           gsl_multimin_function * f,
-                           double *size,
-                           const gsl_vector * step_size) {
+sasimplex_set(void *vstate, gsl_multimin_function * f,
+              const gsl_vector * x,
+              double *size, const gsl_vector * step_size) {
+#if 1
     printf("%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
+#endif
+    double      val;
     int         status;
-    size_t      i;
+    sasimplex_state_t *state = (sasimplex_state_t *) vstate;
     gsl_vector *xtemp = state->ws1;
     gsl_vector *lbound = state->lbound;
     gsl_vector *ubound = state->ubound;
-    gsl_vector_view x = gsl_matrix_row(state->x1, 0);
-    double      val;
+
+    if(xtemp->size != x->size) 
+        GSL_ERROR("incompatible size of x", GSL_EINVAL);
+
+    if(xtemp->size != step_size->size) 
+        GSL_ERROR("incompatible size of step_size", GSL_EINVAL);
+
+    gsl_vector_memcpy(xtemp, x);
+    vector_obey_constraint(xtemp, lbound, ubound);
+
+    /* first point is x0, as modified by inequality constraint */
+    val = GSL_MULTIMIN_FN_EVAL(f, xtemp);
+    if(!gsl_finite(val)) 
+        GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
+
+    gsl_matrix_set_row(state->x1, 0, xtemp);
+    gsl_vector_set(state->f1, 0, val);
+
+    /*
+     * At this point x is unmodified input vector.  xtemp and
+     * state->x1[0] contain constrained version of x.
+     */
+
+    size_t      i;
     int ineq_constraint = 0;
+
+    gsl_vector_view x0 = gsl_matrix_row(state->x1, 0);
 
     assert( (lbound && ubound) || ((!lbound) && (!ubound)) );
 
@@ -843,13 +863,13 @@ sasimplex_set_other_points(sasimplex_state_t *state,
         ineq_constraint = 1;
 
     /* following points are initialized to x0 + step_size */
-    for(i = 0; i < x.vector.size; i++) {
-        status = gsl_vector_memcpy(xtemp, &x.vector);
+    for(i = 0; i < x->size; i++) {
+        status = gsl_vector_memcpy(xtemp, &x0.vector);
         if(status != 0) 
             GSL_ERROR("gsl_vector_memcpy failed", GSL_EFAILED);
 
         {
-            double      xi = gsl_vector_get(&x.vector, i);
+            double      xi = gsl_vector_get(&x0.vector, i);
             xi += gsl_vector_get(step_size, i);
             if(ineq_constraint) {
                 double lb = gsl_vector_get(lbound, i);
@@ -870,40 +890,6 @@ sasimplex_set_other_points(sasimplex_state_t *state,
     printf("%s:%d:%s: bestEver=%lf\n",
            __FILE__, __LINE__, __func__, state->bestEver);
 
-    printf("%s:%d: exit %s\n", __FILE__, __LINE__, __func__);
-    return GSL_SUCCESS;
-}
-
-static int
-sasimplex_set(void *vstate, gsl_multimin_function * f,
-              const gsl_vector * x,
-              double *size, const gsl_vector * step_size) {
-#if 1
-    printf("%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
-#endif
-    double      val;
-    int         status;
-    sasimplex_state_t *state = (sasimplex_state_t *) vstate;
-    gsl_vector *xtemp = state->ws1;
-
-    if(xtemp->size != x->size) 
-        GSL_ERROR("incompatible size of x", GSL_EINVAL);
-
-    if(xtemp->size != step_size->size) 
-        GSL_ERROR("incompatible size of step_size", GSL_EINVAL);
-
-    gsl_vector_memcpy(xtemp, x);
-    vector_obey_constraint(xtemp, state->lbound, state->ubound);
-
-    /* first point is x0, as modified by inequality constraint */
-    val = GSL_MULTIMIN_FN_EVAL(f, xtemp);
-    if(!gsl_finite(val)) 
-        GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
-
-    gsl_matrix_set_row(state->x1, 0, xtemp);
-    gsl_vector_set(state->f1, 0, val);
-
-    status = sasimplex_set_other_points(state, f, size, step_size);
 	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
     printf("%s:%d: exit %s\n", __FILE__, __LINE__, __func__);
     return status;
