@@ -212,6 +212,18 @@ static void sasimplex_sanityCheck(const sasimplex_state_t *state,
 		}
 	}
 
+    printf("%s:%d: trying state->ws1...\n",__FILE__,__LINE__);
+    printf("%s:%d:   state->ws1->size=%zu\n",
+           __FILE__,__LINE__,state->ws1->size);
+    printf("%s:%d:   state->ws1->data[0]=%lf\n",
+           __FILE__,__LINE__,state->ws1->data[0]);
+    printf("%s:%d:   state->ws1->data[1]=%lf\n",
+           __FILE__,__LINE__,state->ws1->data[1]);
+    printf("%s:%d:   gsl_vector_get(ws1,0)=%lf\n",
+           __FILE__,__LINE__, gsl_vector_get(state->ws1, 0));
+    printf("%s:%d:   gsl_vector_get(ws1,1)=%lf\n",
+           __FILE__,__LINE__, gsl_vector_get(state->ws1, 1));
+
 	/* Is center really the center? */
 	(void) compute_center(state, state->ws1);
 	for(j=0; j < n; ++j) {
