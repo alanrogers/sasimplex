@@ -63,6 +63,7 @@
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_matrix_double.h>
+#include <execinfo.h>
 
 /* Abort if random number seed is not yet set */
 #ifndef NDEBUG
@@ -74,10 +75,20 @@
 #  define ASSERT_SEED_SET(s) 
 #endif    
 
+#define REQUIRE(x,file,lineno,func) do {			\
+  if (!(x)) { \
+	  dostacktrace(__FILE__,__LINE__,__func__,stderr);			\
+	  fprintf(stderr,"ERR@%s:%d:%s->%s:%d: Sanity check FAIL\n",\
+			  (file),(lineno),(func),__FILE__,__LINE__);		\
+	  exit(GSL_ESANITY);										\
+   }\
+} while(0)
+
 typedef struct sasimplex_state_t sasimplex_state_t;
 
 static inline double ran_uni(unsigned *seed);
 static inline double ran_expn(unsigned *seed, double mean);
+static inline int Dbl_near(double x, double y);
 static double trial_point(const double p,
                           gsl_vector *trial,
                           const gsl_vector *h,
@@ -110,15 +121,13 @@ static inline double sasimplex_size(sasimplex_state_t *state);
 static inline double obey_constraint(double x, double lo, double hi);
 static void vector_obey_constraint(gsl_vector *v, const gsl_vector *lbound,
                                    const gsl_vector *ubound);
+static void sasimplex_sanityCheck(const sasimplex_state_t *state,
+								  const char *file, int lineno,
+								  const char *func);
+static void dostacktrace(const char *file, int line, const char *func,
+						 FILE * ofp);
 
-/**
- * This structure contains the state of the minimizer.
- * It is like that of nmsimplex2_state_t (in sasimplex2.c)
- * but adds a random number generator.
- *
- * The field called "y1" in nmsimplex2 is called "f1" here to avoid
- * name conflict with the function "y1" in the C math library.
- */
+/** The state of the minimizer */
 struct sasimplex_state_t {
     gsl_matrix *x1;             /* simplex corner points */
     gsl_vector *f1;             /* function value at corner points */
@@ -147,6 +156,80 @@ static const gsl_multimin_fminimizer_type sasimplex_type = {
 
 const       gsl_multimin_fminimizer_type
     * gsl_multimin_fminimizer_sasimplex = &sasimplex_type;
+
+/**
+ * Return 1 if the relative difference between x and y is less than or
+ * equal to DBL_EPSILON.
+ */
+static inline int Dbl_near(double x, double y) {
+    return fabs(x - y) <= fmax(fabs(x), fabs(y)) * DBL_EPSILON;
+}
+
+static void dostacktrace(const char *file, int line, const char *func,
+						 FILE * ofp) {
+	enum {CALLSTACK_SIZE=128};
+    void       *callstack[CALLSTACK_SIZE];
+    int         nsymbols = backtrace(callstack, CALLSTACK_SIZE);
+
+    fprintf(ofp, "backtrace returned %d\n", nsymbols);
+    fprintf(ofp, "dostacktrace called from %s:%d:%s\n", file, line, func);
+    backtrace_symbols_fd(callstack, nsymbols, fileno(ofp));
+}
+
+static void sasimplex_sanityCheck(const sasimplex_state_t *state,
+							 const char *file, int lineno,
+							 const char *func) {
+#ifndef NDEBUG
+	REQUIRE(state->x1 != NULL, file, lineno, func);
+	REQUIRE(state->f1 != NULL, file, lineno, func);
+	REQUIRE(state->ws1 != NULL, file, lineno, func);
+	REQUIRE(state->ws2 != NULL, file, lineno, func);
+	REQUIRE(state->center != NULL, file, lineno, func);
+	REQUIRE(state->delta != NULL, file, lineno, func);
+	REQUIRE(state->center != NULL, file, lineno, func);
+
+	/* either both NULL or both non-NULL */
+	REQUIRE((state->lbound==NULL) ==  (state->ubound==NULL),
+			file, lineno, func);
+
+	size_t i, j;
+	size_t n = state->f1->size;
+	REQUIRE(n>0, file, lineno, func);
+
+	if(state->lbound != NULL) {
+		double lb, ub, x;
+		/* Is simplex within bounds? */
+		for(i=0; i <= n; ++i) {
+			gsl_vector_const_view row = gsl_matrix_const_row(state->x1, i);
+			for(j=0; j < n; ++j) {
+                lb = gsl_vector_get(state->lbound, j);
+                ub = gsl_vector_get(state->ubound, j);
+				x  = gsl_vector_get(&row.vector, j);
+				REQUIRE(lb <= x, file, lineno, func);
+				REQUIRE(x <= ub, file, lineno, func);
+			}
+		}
+
+		/* Is center within bounds? */
+		for(j=0; j < n; ++j) {
+			lb = gsl_vector_get(state->lbound, j);
+			ub = gsl_vector_get(state->ubound, j);
+			x  = gsl_vector_get(state->center, j);
+			REQUIRE(lb <= x, file, lineno, func);
+			REQUIRE(x <= ub, file, lineno, func);
+		}
+	}
+
+	/* Is center really the center? */
+	(void) compute_center(state, state->ws1);
+	for(j=0; j < n; ++j) {
+		double x = gsl_vector_get(state->ws1, j);
+		double y = gsl_vector_get(state->center, j);
+		REQUIRE(Dbl_near(x,y), file, lineno, func);
+	}
+#endif
+}
+
 
 void sasimplex_print(gsl_multimin_fminimizer * minimizer) {
     sasimplex_state_t *state = minimizer->state;
@@ -821,6 +904,7 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
     gsl_vector_set(state->f1, 0, val);
 
     status = sasimplex_set_other_points(state, f, size, step_size);
+	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
     printf("%s:%d: exit %s\n", __FILE__, __LINE__, __func__);
     return status;
 }
@@ -1006,6 +1090,7 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
 
     *size = sasimplex_size(state);
 
+	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
 #ifdef DEBUGGING
     printf("%s:%d: returning from %s\n", __FILE__, __LINE__,
             __func__);
