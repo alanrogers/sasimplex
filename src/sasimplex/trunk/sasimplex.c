@@ -168,8 +168,7 @@ static void dostacktrace(const char *file, int line, const char *func,
 static void sasimplex_sanityCheck(const sasimplex_state_t *state,
 							 const char *file, int lineno,
 							 const char *func) {
-    /*#ifndef NDEBUG*/
-#if 1
+#ifndef NDEBUG
 	REQUIRE(state->x1 != NULL, file, lineno, func);
 	REQUIRE(state->f1 != NULL, file, lineno, func);
 	REQUIRE(state->ws1 != NULL, file, lineno, func);
@@ -196,11 +195,6 @@ static void sasimplex_sanityCheck(const sasimplex_state_t *state,
                 lb = gsl_vector_get(state->lbound, j);
                 ub = gsl_vector_get(state->ubound, j);
 				x  = gsl_vector_get(&row.vector, j);
-                if(lb > x || ub < x) {
-                    printf("%s:%d:%s: x[%zu]=%lf not in [%lf, %lf]\n",
-                           __FILE__,__LINE__,__func__,
-                           j, x,lb,ub);
-                }
 				REQUIRE(lb <= x, file, lineno, func);
 				REQUIRE(x <= ub, file, lineno, func);
 			}
@@ -216,35 +210,14 @@ static void sasimplex_sanityCheck(const sasimplex_state_t *state,
 		}
 	}
 
-    printf("%s:%d: trying state->ws1...\n",__FILE__,__LINE__);
-    printf("%s:%d:   state->ws1->size=%zu\n",
-           __FILE__,__LINE__,state->ws1->size);
-    fflush(stdout);
-    printf("%s:%d:   state->ws1->data[0]=%lf\n",
-           __FILE__,__LINE__,state->ws1->data[0]);
-    fflush(stdout);
-    printf("%s:%d:   state->ws1->data[1]=%lf\n",
-           __FILE__,__LINE__,state->ws1->data[1]);
-    fflush(stdout);
-    printf("%s:%d:   gsl_vector_get(ws1,0)=%lf\n",
-           __FILE__,__LINE__, gsl_vector_get(state->ws1, 0));
-    fflush(stdout);
-    printf("%s:%d:   gsl_vector_get(ws1,1)=%lf\n",
-           __FILE__,__LINE__, gsl_vector_get(state->ws1, 1));
-    fflush(stdout);
-
 	/* Is center really the center? */
 	(void) compute_center(state, state->ws1);
-    printf("%s:%d:%s\n", __FILE__,__LINE__, __func__);
-    fflush(stdout);
 	for(j=0; j < n; ++j) {
 		double x = gsl_vector_get(state->ws1, j);
 		double y = gsl_vector_get(state->center, j);
 		REQUIRE(fabs(x - y) <= fmax(fabs(x), fabs(y)) * 100*DBL_EPSILON,
                 file, lineno, func);
 	}
-    printf("%s:%d:%s\n", __FILE__,__LINE__, __func__);
-    fflush(stdout);
 #endif
 }
 
@@ -588,8 +561,6 @@ contract_by_best(sasimplex_state_t * state, double delta,
  */
 static int
 compute_center(const sasimplex_state_t * state, gsl_vector * center) {
-    printf("%s:%d:%s entry\n", __FILE__,__LINE__, __func__);
-    fflush(stdout);
     gsl_matrix *x1 = state->x1;
     const size_t P = x1->size1;
     size_t      i;
@@ -601,8 +572,6 @@ compute_center(const sasimplex_state_t * state, gsl_vector * center) {
         gsl_blas_daxpy(1.0, &row.vector, center);
     }
     gsl_blas_dscal(1.0/P, center);
-    printf("%s:%d:%s exit\n", __FILE__,__LINE__, __func__);
-    fflush(stdout);
     return GSL_SUCCESS;
 }
 
@@ -648,9 +617,6 @@ compute_size(sasimplex_state_t * state, const gsl_vector * center) {
  * The object itself must be allocated previously.
  */
 static int sasimplex_alloc(void *vstate, size_t n) {
-#if 1
-    printf("%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
-#endif
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
 
     if(n == 0) {
@@ -721,17 +687,10 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     printf("%s:%d:%s: bestEver=%lf\n",
            __FILE__, __LINE__, __func__, state->bestEver);
 
-#if 1
-    printf("%s:%d: returning from %s\n", __FILE__, __LINE__,
-            __func__);
-#endif
     return GSL_SUCCESS;
 }
 
 static void sasimplex_free(void *vstate) {
-#ifdef DEBUGGING
-    printf("%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
-#endif
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
 
     gsl_matrix_free(state->x1);
@@ -745,10 +704,6 @@ static void sasimplex_free(void *vstate) {
         gsl_vector_free(state->lbound);
     if(state->ubound != NULL)
         gsl_vector_free(state->ubound);
-#ifdef DEBUGGING
-    printf("%s:%d: returning from %s\n", __FILE__, __LINE__,
-            __func__);
-#endif
 }
 
 /** Set lower and upper bounds on state vector */
@@ -756,7 +711,6 @@ int sasimplex_set_bounds(gsl_multimin_fminimizer * minimizer,
                          const gsl_vector *lbound,
                          const gsl_vector *ubound,
                          const gsl_vector *step_size) {
-    printf("%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
     sasimplex_state_t *state = minimizer->state;
     gsl_multimin_function *f = minimizer->f;
 
@@ -773,7 +727,6 @@ int sasimplex_set_bounds(gsl_multimin_fminimizer * minimizer,
 
     sasimplex_obey_constraint(state, f);
 	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
-    printf("%s:%d: exit %s\n", __FILE__, __LINE__, __func__);
     return 0;
 }
 
@@ -796,9 +749,6 @@ int sasimplex_obey_constraint(sasimplex_state_t *state,
     compute_center(state, state->center);
     (void) compute_size(state, state->center);
     state->bestEver = gsl_vector_min(state->f1);
-    printf("%s:%d:%s: bestEver=%lf\n",
-           __FILE__, __LINE__, __func__, state->bestEver);
-    printf("%s:%d: exit %s\n", __FILE__, __LINE__, __func__);
     return 0;
 }
 
@@ -859,9 +809,6 @@ static int
 sasimplex_set(void *vstate, gsl_multimin_function * f,
               const gsl_vector * x,
               double *size, const gsl_vector * step_size) {
-#if 1
-    printf("%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
-#endif
     double      val;
     int         status;
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
@@ -930,7 +877,6 @@ sasimplex_set(void *vstate, gsl_multimin_function * f,
            __FILE__, __LINE__, __func__, state->bestEver);
 
 	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
-    printf("%s:%d: exit %s\n", __FILE__, __LINE__, __func__);
     return status;
 }
 
@@ -938,9 +884,6 @@ static int
 sasimplex_onestep(void *vstate, gsl_multimin_function * f,
                   gsl_vector * x, double *size, double *fval) {
 
-#ifdef DEBUGGING
-    printf("%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
-#endif
     /* Simplex iteration tries to minimize function f value */
     /* Includes corrections from Ivo Alxneit <ivo.alxneit@psi.ch> */
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
@@ -1116,10 +1059,6 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * f,
     *size = sasimplex_size(state);
 
 	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
-#ifdef DEBUGGING
-    printf("%s:%d: returning from %s\n", __FILE__, __LINE__,
-            __func__);
-#endif
     return status;
 }
 
