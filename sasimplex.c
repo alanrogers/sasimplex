@@ -166,7 +166,8 @@ static void dostacktrace(const char *file, int line, const char *func,
 static void sasimplex_sanityCheck(const sasimplex_state_t *state,
 							 const char *file, int lineno,
 							 const char *func) {
-#ifndef NDEBUG
+    /*#ifndef NDEBUG*/
+#if 1
 	REQUIRE(state->x1 != NULL, file, lineno, func);
 	REQUIRE(state->f1 != NULL, file, lineno, func);
 	REQUIRE(state->ws1 != NULL, file, lineno, func);
@@ -182,6 +183,7 @@ static void sasimplex_sanityCheck(const sasimplex_state_t *state,
 	size_t i, j;
 	size_t n = state->center->size;
 	REQUIRE(n>0, file, lineno, func);
+	REQUIRE(state->ws1->size == 2, file, lineno, func);
 
 	if(state->lbound != NULL) {
 		double lb, ub, x;
@@ -193,7 +195,7 @@ static void sasimplex_sanityCheck(const sasimplex_state_t *state,
                 ub = gsl_vector_get(state->ubound, j);
 				x  = gsl_vector_get(&row.vector, j);
                 if(lb > x || ub < x) {
-                    printf("%s:%d:%s: x[%d]=%lf not in [%lf, %lf]\n",
+                    printf("%s:%d:%s: x[%zu]=%lf not in [%lf, %lf]\n",
                            __FILE__,__LINE__,__func__,
                            j, x,lb,ub);
                 }
@@ -215,23 +217,32 @@ static void sasimplex_sanityCheck(const sasimplex_state_t *state,
     printf("%s:%d: trying state->ws1...\n",__FILE__,__LINE__);
     printf("%s:%d:   state->ws1->size=%zu\n",
            __FILE__,__LINE__,state->ws1->size);
+    fflush(stdout);
     printf("%s:%d:   state->ws1->data[0]=%lf\n",
            __FILE__,__LINE__,state->ws1->data[0]);
+    fflush(stdout);
     printf("%s:%d:   state->ws1->data[1]=%lf\n",
            __FILE__,__LINE__,state->ws1->data[1]);
+    fflush(stdout);
     printf("%s:%d:   gsl_vector_get(ws1,0)=%lf\n",
            __FILE__,__LINE__, gsl_vector_get(state->ws1, 0));
+    fflush(stdout);
     printf("%s:%d:   gsl_vector_get(ws1,1)=%lf\n",
            __FILE__,__LINE__, gsl_vector_get(state->ws1, 1));
+    fflush(stdout);
 
 	/* Is center really the center? */
 	(void) compute_center(state, state->ws1);
+    printf("%s:%d:%s\n", __FILE__,__LINE__, __func__);
+    fflush(stdout);
 	for(j=0; j < n; ++j) {
 		double x = gsl_vector_get(state->ws1, j);
 		double y = gsl_vector_get(state->center, j);
 		REQUIRE(fabs(x - y) <= fmax(fabs(x), fabs(y)) * 100*DBL_EPSILON,
                 file, lineno, func);
 	}
+    printf("%s:%d:%s\n", __FILE__,__LINE__, __func__);
+    fflush(stdout);
 #endif
 }
 
@@ -575,6 +586,8 @@ contract_by_best(sasimplex_state_t * state, double delta,
  */
 static int
 compute_center(const sasimplex_state_t * state, gsl_vector * center) {
+    printf("%s:%d:%s entry\n", __FILE__,__LINE__, __func__);
+    fflush(stdout);
     gsl_matrix *x1 = state->x1;
     const size_t P = x1->size1;
     size_t      i;
@@ -586,7 +599,8 @@ compute_center(const sasimplex_state_t * state, gsl_vector * center) {
         gsl_blas_daxpy(1.0, &row.vector, center);
     }
     gsl_blas_dscal(1.0/P, center);
-	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
+    printf("%s:%d:%s exit\n", __FILE__,__LINE__, __func__);
+    fflush(stdout);
     return GSL_SUCCESS;
 }
 
@@ -1214,6 +1228,7 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
     /* reset simplex size */
     minimizer->size = compute_size(state, state->center);
 
+	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
     return GSL_SUCCESS;
 }
 
