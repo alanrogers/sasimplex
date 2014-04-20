@@ -116,6 +116,8 @@ static inline double sasimplex_size(sasimplex_state_t *state);
 static inline double obey_constraint(double x, double lo, double hi);
 static void vector_obey_constraint(gsl_vector *v, const gsl_vector *lbound,
                                    const gsl_vector *ubound);
+int sasimplex_obey_constraint(sasimplex_state_t *state,
+                              gsl_multimin_function *f);
 static void sasimplex_sanityCheck(const sasimplex_state_t *state,
 								  const char *file, int lineno,
 								  const char *func);
@@ -757,7 +759,6 @@ int sasimplex_set_bounds(gsl_multimin_fminimizer * minimizer,
     printf("%s:%d: enter %s\n", __FILE__, __LINE__, __func__);
     sasimplex_state_t *state = minimizer->state;
     gsl_multimin_function *f = minimizer->f;
-    size_t i, npts = state->f1->size;
 
     if(lbound==NULL || ubound==NULL)
         GSL_ERROR("NULL vector passed to sasimplex_set_bounds", GSL_EDOM);
@@ -769,6 +770,20 @@ int sasimplex_set_bounds(gsl_multimin_fminimizer * minimizer,
 
     gsl_vector_memcpy(state->lbound, lbound);
     gsl_vector_memcpy(state->ubound, ubound);
+
+    sasimplex_obey_constraint(state, f);
+	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
+    printf("%s:%d: exit %s\n", __FILE__, __LINE__, __func__);
+    return 0;
+}
+
+int sasimplex_obey_constraint(sasimplex_state_t *state,
+                               gsl_multimin_function *f) {
+
+    if(state->lbound==NULL || state->ubound==NULL)
+        return 0;
+
+    size_t i, npts = state->f1->size;
 
     for(i=0; i < npts; ++i) {
         gsl_vector_view x = gsl_matrix_row(state->x1, i);
@@ -783,8 +798,6 @@ int sasimplex_set_bounds(gsl_multimin_fminimizer * minimizer,
     state->bestEver = gsl_vector_min(state->f1);
     printf("%s:%d:%s: bestEver=%lf\n",
            __FILE__, __LINE__, __func__, state->bestEver);
-
-	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
     printf("%s:%d: exit %s\n", __FILE__, __LINE__, __func__);
     return 0;
 }
@@ -1222,12 +1235,7 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
             gsl_vector_set(state->f1, i + 1, val);
         }
     }
-
-    compute_center(state, state->center);
-
-    /* reset simplex size */
-    minimizer->size = compute_size(state, state->center);
-
+    sasimplex_obey_constraint(state, func);
 	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
     return GSL_SUCCESS;
 }
