@@ -187,7 +187,6 @@ static void sasimplex_sanityCheck(const sasimplex_state_t *state,
 	size_t i, j;
 	size_t n = state->center->size;
 	REQUIRE(n>0, file, lineno, func);
-	REQUIRE(state->ws1->size == 2, file, lineno, func);
 
 	if(state->lbound != NULL) {
 		double lb, ub, x;
