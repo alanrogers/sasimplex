@@ -113,8 +113,8 @@ static int  sasimplex_onestep(void *vstate, gsl_multimin_function * f,
 							  gsl_vector * x, double *size, double *fval);
 static size_t vector_min_index(const gsl_vector *v);
 static inline double sasimplex_size(sasimplex_state_t *state);
-static inline double obey_constraint(double x, double lo, double hi);
-static void vector_obey_constraint(gsl_vector *v, const gsl_vector *lbound,
+static inline double constrain_value(double x, double lo, double hi);
+static void constrain_vector(gsl_vector *v, const gsl_vector *lbound,
                                    const gsl_vector *ubound);
 int constrain_simplex(gsl_matrix *x1, 
                       gsl_vector *fvals,
@@ -345,7 +345,7 @@ sasimplex_converged(gsl_multimin_fminimizer * minimizer, double tol_fval,
  * Fold x back and forth across the boundaries "lo" and "hi" to obtain a value
  * y such that lo <= y <= hi.
  */
-static inline double obey_constraint(double x, double lo, double hi) {
+static inline double constrain_value(double x, double lo, double hi) {
     assert(hi > lo);
     x -= lo;
     hi -= lo;
@@ -358,7 +358,7 @@ static inline double obey_constraint(double x, double lo, double hi) {
 }
 
 /** Contrain all entries of v to lie between lower and upper bounds */
-static void vector_obey_constraint(gsl_vector *v,
+static void constrain_vector(gsl_vector *v,
                                    const gsl_vector *lbound,
                                    const gsl_vector *ubound) {
     size_t i;
@@ -368,7 +368,7 @@ static void vector_obey_constraint(gsl_vector *v,
             double val = gsl_vector_get(v, i);
             double lb = gsl_vector_get(lbound, i);
             double ub = gsl_vector_get(ubound, i);
-            val = obey_constraint(val, lb, ub);
+            val = constrain_value(val, lb, ub);
             gsl_vector_set(v, i, val);
         }
     }
@@ -435,7 +435,7 @@ trial_point(const double p,
         if(ineq_constraint) {
             double lb = gsl_vector_get(lbound, i);
             double ub = gsl_vector_get(ubound, i);
-            try = obey_constraint(try, lb, ub);
+            try = constrain_value(try, lb, ub);
             assert(try >= lb);
             assert(try <= ub);
         }
@@ -757,7 +757,7 @@ int constrain_simplex(gsl_matrix *x1,
 
     for(i=0; i < npts; ++i) {
         gsl_vector_view x = gsl_matrix_row(x1, i);
-        vector_obey_constraint(&x.vector, lbound, ubound);
+        constrain_vector(&x.vector, lbound, ubound);
         double val = GSL_MULTIMIN_FN_EVAL(f, &x.vector);
         if(!gsl_finite(val)) 
             GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
