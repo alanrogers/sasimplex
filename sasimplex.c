@@ -535,8 +535,6 @@ contract_by_best(sasimplex_state_t * state, double delta,
         if(gsl_finite(newval)) {
             if(newval < state->bestEver) {
                 state->bestEver = newval;
-                printf("%s:%d:%s: bestEver=%lf\n",
-                       __FILE__, __LINE__, __func__, state->bestEver);
             }
         }else{
             /* Bad function value: finish contraction (and do not
@@ -687,8 +685,6 @@ static int sasimplex_alloc(void *vstate, size_t n) {
     state->temperature = 0.0;
     state->seedSet = state->seed = 0;
     state->bestEver = DBL_MAX;
-    printf("%s:%d:%s: bestEver=%lf\n",
-           __FILE__, __LINE__, __func__, state->bestEver);
 
     return GSL_SUCCESS;
 }
@@ -869,8 +865,6 @@ sasimplex_set(void *vstate, gsl_multimin_function * func,
     compute_center(state, state->center);
     *size = compute_size(state, state->center);
     state->bestEver = gsl_vector_min(state->f1);
-    printf("%s:%d:%s: bestEver=%lf\n",
-           __FILE__, __LINE__, __func__, state->bestEver);
 
 	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
     return status;
@@ -1046,11 +1040,8 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * func,
     gsl_matrix_get_row(x, x1, lo);
     *fval = gsl_vector_get(fvec, lo);
 
-    if(*fval < state->bestEver) {
+    if(*fval < state->bestEver) 
         state->bestEver = *fval;
-        printf("%s:%d:%s: bestEver=%lf\n",
-               __FILE__, __LINE__, __func__, state->bestEver);
-    }
 
     *size = sasimplex_size(state);
 
@@ -1104,11 +1095,8 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
 		gsl_vector_memcpy(minimizer->x, xtemp);
         val = GSL_MULTIMIN_FN_EVAL(func, xtemp);
         if(gsl_finite(val)) {
-            if(val < state->bestEver) {
+            if(val < state->bestEver)
                 state->bestEver = val;
-                printf("%s:%d:%s: bestEver=%lf\n",
-                       __FILE__, __LINE__, __func__, state->bestEver);
-            }
         }else{
             GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
         }
@@ -1158,11 +1146,8 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
             gsl_vector_view r_i = gsl_matrix_row(&m.matrix, i);
             val = GSL_MULTIMIN_FN_EVAL(minimizer->f, &r_i.vector);
             if(gsl_finite(val)) {
-                if(val < state->bestEver) {
+                if(val < state->bestEver) 
                     state->bestEver = val;
-                    printf("%s:%d:%s: bestEver=%lf\n",
-                           __FILE__, __LINE__, __func__, state->bestEver);
-                }
             }else{
                 GSL_ERROR("non-finite function value encountered",
                           GSL_EBADFUNC);
