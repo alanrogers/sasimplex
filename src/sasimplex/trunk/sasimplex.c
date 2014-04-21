@@ -214,12 +214,20 @@ static void sasimplex_sanityCheck(const sasimplex_state_t *state,
 
 	/* Is center really the center? */
 	(void) compute_center(state, state->ws1);
+    double absdiff=0.0, absmax=0.0;
+    const double reltol = 0.01;
 	for(j=0; j < n; ++j) {
 		double x = gsl_vector_get(state->ws1, j);
 		double y = gsl_vector_get(state->center, j);
-		REQUIRE(fabs(x - y) <= fmax(fabs(x), fabs(y)) * 100*DBL_EPSILON,
-                file, lineno, func);
+        absdiff += fabs(x-y);
+        absmax += fmax(fabs(x), fabs(y));
 	}
+    if(absdiff > absmax * reltol) {
+        printf("absdiff=%le absmax=%le relerr=%le > %le\n",
+               absdiff, absmax, absdiff/absmax, reltol);
+        fflush(stdout);
+    }
+    REQUIRE(absdiff <= absmax * reltol, file, lineno, func);
 #endif
 }
 
