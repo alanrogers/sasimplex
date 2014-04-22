@@ -246,15 +246,15 @@ void sasimplex_print(gsl_multimin_fminimizer * minimizer) {
     printf(" tmptr=%lf\n", state->temperature);
     printf(" bestEver=%lf\n", state->bestEver);
     if(state->lbound != NULL) {
-        printf(" lower bound:");
-        for(i=0; i < n; ++i) 
-            printf(" %lf", gsl_vector_get(state->lbound, i));
-        putchar('\n');
-    }
-    if(state->ubound != NULL) {
         printf(" upper bound:");
         for(i=0; i < n; ++i) 
             printf(" %lf", gsl_vector_get(state->ubound, i));
+        putchar('\n');
+    }
+    if(state->ubound != NULL) {
+        printf(" lower bound:");
+        for(i=0; i < n; ++i) 
+            printf(" %lf", gsl_vector_get(state->lbound, i));
         putchar('\n');
     }
 }
