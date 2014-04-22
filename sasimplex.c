@@ -1168,7 +1168,6 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
 
     compute_center(state, state->center);
     (void) compute_size(state, state->center);
-    state->bestEver = gsl_vector_min(state->f1);
 
 	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
     return GSL_SUCCESS;
