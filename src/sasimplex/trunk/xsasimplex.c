@@ -77,7 +77,7 @@ int main(void) {
     int         nT  = 5;               /* number of temperatures */
     int         nPerT = 200;            /* iterations per temperature */
     double      initT = 3.0;            /* initial temperature */
-    double      decay = 0.7;
+    double      decay = 0.5;
 
     unsigned    i, try;
     int         status;

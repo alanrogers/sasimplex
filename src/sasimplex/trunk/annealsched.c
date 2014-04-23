@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
@@ -14,7 +15,12 @@ struct AnnealSched {
     int         iT;                /* index of current tmptr */
 	double      T;                 /* current temperature */
     double      initT;             /* initial temperature */
-    double      decay;             /* rate at which temperature decays */
+
+	/*
+	 * temperature decays as t[i+1] = t[i]*alpha - beta
+	 * t[0] is initT; t[nT-1] is 0.
+	 */
+    double      alpha, beta;
 };
 
 /**
@@ -22,9 +28,9 @@ struct AnnealSched {
  *
  * nT      : the number of temperatures
  * initT: initial relative temperature
- * decay   : the rate at which T declines
+ * alpha   : controls rate of temperature decay
  */
-AnnealSched *AnnealSched_alloc(int nT, double initT, double decay) {
+AnnealSched *AnnealSched_alloc(int nT, double initT, double alpha) {
     AnnealSched *s = malloc(sizeof(AnnealSched));
     if(s == NULL) {
         fprintf(stderr, "bad malloc\n");
@@ -33,8 +39,9 @@ AnnealSched *AnnealSched_alloc(int nT, double initT, double decay) {
     if(nT == 1)
         initT = 0.0;
     s->initT = initT;
-    s->decay = decay;
     s->nT = nT;
+    s->alpha = alpha;
+	s->beta = initT*(alpha-1.0)/(1.0 - pow(alpha, 1.0-nT));
 	AnnealSched_reset(s);
 	return s;
 }
@@ -79,13 +86,13 @@ double AnnealSched_next(AnnealSched * s) {
     if(s->iT == s->nT-1) 
         s->T = 0.0;
     else
-        s->T *= s->decay;
+        s->T = (s->T)*(s->alpha) - s->beta;
 
     return tmptr;
 }
 
 void AnnealSched_print(AnnealSched *s, FILE *fp) {
     fprintf(fp, "%s: iT=%d/%d",  __func__, s->iT, s->nT);
-    fprintf(fp, " initT=%lf currT=%lf\n",
-            s->initT, s->T);
+    fprintf(fp, " initT=%lf currT=%lf alpha=%lf beta=%lf\n",
+            s->initT, s->T, s->alpha, s->beta);
 }
