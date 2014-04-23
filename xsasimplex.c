@@ -71,7 +71,7 @@ int main(void) {
     const double tol_size = 1e-4;
     double      initStepSize = 0.05;
     const int   rotate = 1;             /* random rotation of init simplex?*/
-	const int   verbose = 1;
+	const int   verbose = 0;
     unsigned long seed = time(NULL);    /* for random numbers */
 	unsigned    nTries = 20;            /* number of random starts */
     int         nT  = 5;               /* number of temperatures */
@@ -165,9 +165,8 @@ int main(void) {
                 break;
         }
         if(!verbose) {
-            printf("%2d: size=%.4le aberr=%.4le vscale=%.4lf x=",
-                   try, size, absErr,
-                   sasimplex_vertical_scale(minimizer));
+            printf("%2d: size=%.4lf vscale=%.4lf aberr=%.4lf x=",
+                   try, size, sasimplex_vertical_scale(minimizer), absErr);
             pr_vector(stdout, "%+7.4lf", minimizer->x);
         }
 		switch (status) {
@@ -175,8 +174,7 @@ int main(void) {
 			printf(" converged\n");
 			break;
         case GSL_CONTINUE:
-			printf(" no convergence in %d iterations at tmptr %lf\n",
-                   nPerT, temperature);
+			printf(" no convergence\n");
             sasimplex_print(minimizer);
 			break;
 		default:
