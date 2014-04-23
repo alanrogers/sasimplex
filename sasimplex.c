@@ -207,8 +207,15 @@ static void sasimplex_sanityCheck(const sasimplex_state_t *state,
 			lb = gsl_vector_get(state->lbound, j);
 			ub = gsl_vector_get(state->ubound, j);
 			x  = gsl_vector_get(state->center, j);
-			REQUIRE(lb <= x, file, lineno, func);
-			REQUIRE(x <= ub, file, lineno, func);
+			if(x < lb) {
+				printf("%s:%d:%s: x=%lf < %lf; diff=%le]\n",
+					   __FILE__,__LINE__,__func__,x, lb, lb-x);
+			}else if(x > ub) {
+				printf("%s:%d:%s: x=%lf > %lf; diff=%le]\n",
+					   __FILE__,__LINE__,__func__,x, ub, x-ub);
+			}
+			REQUIRE(lb - DBL_EPSILON <= x, file, lineno, func);
+			REQUIRE(x <= ub + DBL_EPSILON, file, lineno, func);
 		}
 	}
 
