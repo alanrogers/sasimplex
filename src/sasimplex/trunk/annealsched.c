@@ -83,10 +83,10 @@ double AnnealSched_next(AnnealSched * s) {
     double tmptr = s->T;
 
     ++s->iT;
-    if(s->iT == s->nT-1) 
-        s->T = 0.0;
-    else
+    if(s->iT < s->nT-1) 
         s->T = (s->T)*(s->alpha) - s->beta;
+	else
+        s->T = 0.0;
 
     return tmptr;
 }
