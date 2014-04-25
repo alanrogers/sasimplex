@@ -849,7 +849,7 @@ sasimplex_set(void *vstate, gsl_multimin_function * func,
     /* first point is x0 */
     val = GSL_MULTIMIN_FN_EVAL(func, x);
     if(!gsl_finite(val)) 
-        GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
+        GSL_ERROR("non-finite function value", GSL_EBADFUNC);
 
     gsl_matrix_set_row(state->x1, 0, x);
     gsl_vector_set(state->f1, 0, val);
