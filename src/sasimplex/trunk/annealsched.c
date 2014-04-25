@@ -4,6 +4,7 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
+#include <gsl/gsl_errno.h>
 #include "annealsched.h"
 
 /**
@@ -28,7 +29,11 @@ struct AnnealSched {
  *
  * nT      : the number of temperatures
  * initT: initial relative temperature
- * alpha   : controls rate of temperature decay
+ * alpha   : controls rate of temperature decay. Must be in [0, 1].
+ *
+ * For values of alpha near 1:
+ *
+ * beta = 1/(n-1) + n*(a-1)/(2*(n-1)) + (a-1)^2 * n * (n-2)/(12*(n-1));
  */
 AnnealSched *AnnealSched_alloc(int nT, double initT, double alpha) {
     AnnealSched *s = malloc(sizeof(AnnealSched));
@@ -41,7 +46,28 @@ AnnealSched *AnnealSched_alloc(int nT, double initT, double alpha) {
     s->initT = initT;
     s->nT = nT;
     s->alpha = alpha;
-	s->beta = initT*(alpha-1.0)/(1.0 - pow(alpha, 1.0-nT));
+    if(alpha <= 0.0) {
+        fprintf(stderr, "%s:%d:%s alpha must be > 0\n", 
+			__FILE__, __LINE__, __func__);
+        exit(GSL_EINVAL);
+    }else if(alpha > 1.0) {
+        fprintf(stderr, "%s:%d:%s alpha must be <= 1\n", 
+			__FILE__, __LINE__, __func__);
+        exit(GSL_EINVAL);
+    }else if(alpha == 1.0) {
+        /* limit as alpha -> 1 */
+        s->beta = 1.0/(nT-1.0);
+    }else if(alpha < 0.99995){
+        /* alpha far from 1: use full formula */
+        s->beta = (alpha-1.0)/(1.0 - pow(alpha, 1.0-nT));
+    }else {
+        /* alpha close to 1: use 2nd-order Taylor approximation */
+        double am1 = alpha - 1.0;
+        s->beta = 1.0/(nT-1)
+            + nT*am1/(2*(nT-1))
+            + am1*am1 * (nT * (nT-2))/(12.0*(nT-1));
+    }
+    s->beta *= initT;
 	AnnealSched_reset(s);
 	return s;
 }
