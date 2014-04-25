@@ -138,6 +138,7 @@ struct sasimplex_state_t {
     gsl_vector *xmc;            /* x - center (workspace) */
     gsl_vector *lbound;         /* lower bound */
     gsl_vector *ubound;         /* upper bound */
+    gsl_vector *step_size;      /* size of initial simplex */
     double      S2;
     double      temperature;    /* increase to flatten surface */
     double      bestEver;       /* best func val ever seen */
@@ -696,6 +697,18 @@ static int sasimplex_alloc(void *vstate, size_t n) {
         GSL_ERROR("failed to allocate space for xmc", GSL_ENOMEM);
     }
 
+    state->step_size = gsl_vector_alloc(n);
+    if(state->step_size == NULL) {
+        gsl_matrix_free(state->x1);
+        gsl_vector_free(state->f1);
+        gsl_vector_free(state->ws1);
+        gsl_vector_free(state->ws2);
+        gsl_vector_free(state->center);
+        gsl_vector_free(state->delta);
+        gsl_vector_free(state->xmc);
+        GSL_ERROR("failed to allocate space for step_size", GSL_ENOMEM);
+    }
+
     state->lbound = state->ubound = NULL;
 
     state->temperature = 0.0;
@@ -715,6 +728,7 @@ static void sasimplex_free(void *vstate) {
     gsl_vector_free(state->center);
     gsl_vector_free(state->delta);
     gsl_vector_free(state->xmc);
+    gsl_vector_free(state->step_size);
     if(state->lbound != NULL)
         gsl_vector_free(state->lbound);
     if(state->ubound != NULL)
@@ -845,6 +859,10 @@ sasimplex_set(void *vstate, gsl_multimin_function * func,
 
     if(xtemp->size != step_size->size) 
         GSL_ERROR("incompatible size of step_size", GSL_EINVAL);
+
+    status = gsl_vector_memcpy(state->step_size, step_size);
+    if(status != 0) 
+        GSL_ERROR("gsl_vector_memcpy failed", GSL_EFAILED);
 
     /* first point is x0 */
     val = GSL_MULTIMIN_FN_EVAL(func, x);
