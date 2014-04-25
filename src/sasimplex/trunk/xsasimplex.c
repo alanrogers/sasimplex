@@ -140,7 +140,8 @@ int main(void) {
         int iT = 0;  /* index of current temperature */
 		AnnealSched_reset(sched);
 		if(try > 0)
-			sasimplex_randomize_state(minimizer, rotate, loInit, hiInit, step_size);
+			sasimplex_randomize_state(minimizer, rotate, loInit, hiInit,
+                                      step_size);
         for(iT=0; iT<nT; ++iT) {  /* iterate over temperatures */
             temperature = AnnealSched_next(sched);
             status = sasimplex_n_iterations(minimizer,
