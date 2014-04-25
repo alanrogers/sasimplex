@@ -516,6 +516,16 @@ update_point(sasimplex_state_t * state, size_t i,
 	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
 }
 
+static int
+expand_around_best(sasimplex_state_t *state) {
+    gsl_matrix *x1 = state->x1;
+    gsl_vector *f1 = state->f1;
+    size_t i, best = vector_min_index(state->fval);
+
+    XXXXXXXXXXXXXXXXXXX not written yet
+    
+}
+
 /*
  * Function contracts the simplex in respect to best valued
  * corner. That is, all corners besides the best corner are
