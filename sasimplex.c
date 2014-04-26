@@ -121,6 +121,7 @@ int constrain_simplex(gsl_matrix *x1,
                       gsl_vector *lbound,
                       gsl_vector *ubound,
                       gsl_multimin_function *f);
+static int expand_around_best(sasimplex_state_t *state, gsl_multimin_function * func);
 static void sasimplex_sanityCheck(const sasimplex_state_t *state,
 								  const char *file, int lineno,
 								  const char *func);
@@ -130,7 +131,7 @@ static void dostacktrace(const char *file, int line, const char *func,
 /** The state of the minimizer */
 struct sasimplex_state_t {
     gsl_matrix *x1;             /* simplex corner points */
-    gsl_vector *f1;             /* function value at corner points */
+    gsl_vector *f1;             /* function values at corner points */
     gsl_vector *ws1;            /* workspace 1 for algorithm */
     gsl_vector *ws2;            /* workspace 2 for algorithm */
     gsl_vector *center;         /* center of all points */
@@ -517,13 +518,36 @@ update_point(sasimplex_state_t * state, size_t i,
 }
 
 static int
-expand_around_best(sasimplex_state_t *state) {
+expand_around_best(sasimplex_state_t *state, gsl_multimin_function * func) {
     gsl_matrix *x1 = state->x1;
     gsl_vector *f1 = state->f1;
-    size_t i, best = vector_min_index(state->fval);
+    gsl_vector *xtemp = state->ws1;
+	int status = GSL_SUCCESS;
+    size_t i, best = vector_min_index(f1);
+	size_t j=0;
+	const double scale = 0.1;
 
-    XXXXXXXXXXXXXXXXXXX not written yet
-    
+	for(i=0; i < x1->size1; ++i) {
+		if(i == best)
+			continue;
+		gsl_matrix_get_row(xtemp, x1, i);
+		double x = gsl_vector_get(xtemp, j);
+		x += scale * gsl_vector_get(state->step_size, j);
+		gsl_vector_set(xtemp, j, x);
+		gsl_matrix_set_row(x1, i, xtemp);
+		++j;
+	}
+
+    status = constrain_simplex(state->x1, state->f1, state->lbound,
+							   state->ubound, func);
+    if(status != GSL_SUCCESS) 
+        GSL_ERROR("constrain_simplex failed", GSL_EFAILED);
+    compute_center(state, state->center);
+    (void) compute_size(state, state->center);
+	double currBest = gsl_vector_min(state->f1);
+	if(currBest < state->bestEver)
+		state->bestEver = currBest;
+	return status;
 }
 
 /*
@@ -751,6 +775,7 @@ int sasimplex_set_bounds(gsl_multimin_fminimizer * minimizer,
                          const gsl_vector *ubound,
                          const gsl_vector *step_size) {
     sasimplex_state_t *state = minimizer->state;
+	int status = GSL_SUCCESS;
 
     if(lbound==NULL || ubound==NULL)
         GSL_ERROR("NULL vector passed to sasimplex_set_bounds", GSL_EDOM);
@@ -763,15 +788,17 @@ int sasimplex_set_bounds(gsl_multimin_fminimizer * minimizer,
     gsl_vector_memcpy(state->lbound, lbound);
     gsl_vector_memcpy(state->ubound, ubound);
 
-    constrain_simplex(state->x1, state->f1, state->lbound,
-                      state->ubound, minimizer->f);
+    status = constrain_simplex(state->x1, state->f1, state->lbound,
+							   state->ubound, minimizer->f);
+    if(status != GSL_SUCCESS) 
+        GSL_ERROR("constrain_simplex failed", GSL_EFAILED);
 
     compute_center(state, state->center);
     (void) compute_size(state, state->center);
     state->bestEver = gsl_vector_min(state->f1);
 
 	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
-    return 0;
+    return status;
 }
 
 /**
@@ -799,7 +826,7 @@ int constrain_simplex(gsl_matrix *x1,
             GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
         gsl_vector_set(fvals, i, val);
     }
-    return 0;
+    return GSL_SUCCESS;
 }
 
 /**
@@ -903,9 +930,10 @@ sasimplex_set(void *vstate, gsl_multimin_function * func,
         gsl_vector_set(state->f1, i + 1, val);
     }
 
-    constrain_simplex(state->x1, state->f1, state->lbound,
-                      state->ubound, func);
-    
+    status = constrain_simplex(state->x1, state->f1, state->lbound,
+							   state->ubound, func);
+    if(status != GSL_SUCCESS) 
+        GSL_ERROR("constrain_simplex failed", GSL_EFAILED);
     compute_center(state, state->center);
     *size = compute_size(state, state->center);
     state->bestEver = gsl_vector_min(state->f1);
@@ -1105,6 +1133,7 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
     size_t      i, j;
     gsl_vector *xtemp = state->ws1;
     size_t      stateDim = xtemp->size;
+	int status = GSL_SUCCESS;
 
 	ASSERT_SEED_SET(state);
     /*
@@ -1199,8 +1228,10 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
         }
     }
 
-    constrain_simplex(state->x1, state->f1, state->lbound,
-                      state->ubound, func);
+    status = constrain_simplex(state->x1, state->f1, state->lbound,
+							   state->ubound, func);
+    if(status != GSL_SUCCESS) 
+        GSL_ERROR("constrain_simplex failed", GSL_EFAILED);
 
     compute_center(state, state->center);
     (void) compute_size(state, state->center);
@@ -1226,6 +1257,7 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
                            double temperature,
                            int verbose) {
     int itr=0, status;
+	sasimplex_state_t *state = minimizer->state;
 
     sasimplex_set_temp(minimizer, temperature);
     if(verbose) {
@@ -1256,7 +1288,10 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
             break;
         case GSL_ETOLF:
             /* stuck */
-            status = GSL_CONTINUE;
+			status = expand_around_best(state, minimizer->f);
+			if(status != GSL_SUCCESS) 
+				GSL_ERROR("expand_around_best failed", GSL_EFAILED);
+			status = GSL_CONTINUE;
             break;
         case GSL_CONTINUE:
             break;
