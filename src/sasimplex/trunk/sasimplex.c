@@ -1156,18 +1156,18 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
         gsl_vector_set(state->f1, 0, val);
     }
 
+    gsl_matrix_view m =
+        gsl_matrix_submatrix(state->x1, 1, 0, stateDim, stateDim);
+
+    gsl_matrix_set_identity(&m.matrix);
+
+    /* start with random reflections */
+    for(i = 0; i < stateDim; i++) {
+        if(0.5 < ran_uni(&state->seed))
+            gsl_matrix_set(&m.matrix, i, i, -1.0);
+    }
+
     if(rotate) {
-        gsl_matrix_view m =
-            gsl_matrix_submatrix(state->x1, 1, 0, stateDim, stateDim);
-
-        gsl_matrix_set_identity(&m.matrix);
-
-        /* start with random reflections */
-        for(i = 0; i < stateDim; i++) {
-            if(0.5 < ran_uni(&state->seed))
-                gsl_matrix_set(&m.matrix, i, i, -1.0);
-        }
-
         /* apply random rotations */
         for(i = 0; i < stateDim; i++) {
             for(j = i + 1; j < stateDim; j++) {
@@ -1180,21 +1180,36 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
                 gsl_blas_drot(&c_i.vector, &c_j.vector, c, s);
             }
         }
+    }
 
-        /* scale the orthonormal basis by the user-supplied step_size in
-         * each dimension, and use as an offset from the central point x */
-        for(i = 0; i < stateDim; i++) {
-            double      x_i = gsl_vector_get(&row0.vector, i);
-            double      s_i = gsl_vector_get(step_size, i);
-            gsl_vector_view c_i = gsl_matrix_column(&m.matrix, i);
+    /* scale the orthonormal basis by the user-supplied step_size in
+     * each dimension, and use as an offset from the central point x */
+    for(i = 0; i < stateDim; i++) {
+        double      x_i = gsl_vector_get(&row0.vector, i);
+        double      s_i = gsl_vector_get(step_size, i);
+        gsl_vector_view c_i = gsl_matrix_column(&m.matrix, i);
 
-            for(j = 0; j < stateDim; j++) {
-                double      x_ij = gsl_vector_get(&c_i.vector, j);
-                gsl_vector_set(&c_i.vector, j, x_i + s_i * x_ij);
-            }
+        for(j = 0; j < stateDim; j++) {
+            double      x_ij = gsl_vector_get(&c_i.vector, j);
+            gsl_vector_set(&c_i.vector, j, x_i + s_i * x_ij);
         }
+    }
 
-        /* compute the function values at each offset point */
+    if( state->lbound!=NULL && state->ubound!=NULL) {
+        /*
+         * If constraints exist enforce them here. In this case,
+         * function values are calculated within constratin_simplex
+         * and need not be calculated here.
+         */
+        status = constrain_simplex(state->x1, state->f1, state->lbound,
+                                   state->ubound, func);
+        if(status != GSL_SUCCESS)
+            GSL_ERROR("constrain_simplex failed", GSL_EFAILED);
+    }else{
+        /*
+         * No constraints exist, so we need to calculate function
+         * values.
+         */
         for(i = 0; i < stateDim; i++) {
             gsl_vector_view r_i = gsl_matrix_row(&m.matrix, i);
             val = GSL_MULTIMIN_FN_EVAL(minimizer->f, &r_i.vector);
@@ -1209,11 +1224,6 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
             gsl_vector_set(state->f1, i + 1, val);
         }
     }
-
-    status = constrain_simplex(state->x1, state->f1, state->lbound,
-                               state->ubound, func);
-    if(status != GSL_SUCCESS)
-        GSL_ERROR("constrain_simplex failed", GSL_EFAILED);
 
     compute_center(state, state->center);
     (void) compute_size(state, state->center);
