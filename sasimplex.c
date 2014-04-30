@@ -3,21 +3,21 @@
  * Copyright (C) 2014 Alan Rogers
  * Copyright (C) 2007, 2008, 2009 Brian Gough
  * Copyright (C) 2002 Tuomo Keskitalo, Ivo Alxneit
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3 of the License, or (at
  * your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301, USA. 
+ * 02110-1301, USA.
  */
 
 /*
@@ -37,7 +37,7 @@
  ******************************************************************
  * Documentation from simplex2.c:
  * - Originally written by Tuomo Keskitalo <tuomo.keskitalo@iki.fi>
- * - Corrections to nmsimplex_iterate and other functions 
+ * - Corrections to nmsimplex_iterate and other functions
  *   by Ivo Alxneit <ivo.alxneit@psi.ch>
  * - Additional help by Brian Gough <bjg@network-theory.co.uk>
  * - Optimisations added by Brian Gough <bjg@network-theory.co.uk>
@@ -68,19 +68,19 @@
 /* Abort if random number seed is not yet set */
 #ifndef NDEBUG
 #  define ASSERT_SEED_SET(s) do{ if(!((s)->seedSet)) { \
-	fprintf(stderr, "\nERR@%s:%d: call sasimplex_random_seed before %s\n",\
-			__FILE__, __LINE__, __func__);\
-	exit(GSL_EINVAL); } }while(0)
+    fprintf(stderr, "\nERR@%s:%d: call sasimplex_random_seed before %s\n", \
+            __FILE__, __LINE__, __func__);                                 \
+    exit(GSL_EINVAL); } }while(0)
 #else
-#  define ASSERT_SEED_SET(s) 
-#endif    
+#  define ASSERT_SEED_SET(s)
+#endif
 
-#define REQUIRE(x,file,lineno,func) do {			\
+#define REQUIRE(x,file,lineno,func) do {            \
   if (!(x)) { \
-	  dostacktrace(__FILE__,__LINE__,__func__,stderr);			\
-	  fprintf(stderr,"ERR@%s:%d:%s->%s:%d: Sanity check FAIL\n",\
-			  (file),(lineno),(func),__FILE__,__LINE__);		\
-	  exit(GSL_ESANITY);										\
+      dostacktrace(__FILE__,__LINE__,__func__,stderr);          \
+      fprintf(stderr,"ERR@%s:%d:%s->%s:%d: Sanity check FAIL\n",\
+              (file),(lineno),(func),__FILE__,__LINE__);        \
+      exit(GSL_ESANITY);                                        \
    }\
 } while(0)
 
@@ -89,17 +89,17 @@ typedef struct sasimplex_state_t sasimplex_state_t;
 static inline double ran_uni(unsigned *seed);
 static inline double ran_expn(unsigned *seed, double mean);
 static double trial_point(const double p,
-                          gsl_vector *trial,
-                          const gsl_vector *h,
-                          const gsl_vector *c,
-                          const gsl_vector *lbound,
-                          const gsl_vector *ubound,
+                          gsl_vector * trial,
+                          const gsl_vector * h,
+                          const gsl_vector * c,
+                          const gsl_vector * lbound,
+                          const gsl_vector * ubound,
                           const gsl_multimin_function * f);
 static void update_point(sasimplex_state_t * state, size_t i,
                          const gsl_vector * x, double val);
 static int  contract_by_best(sasimplex_state_t * state, double delta,
-							 size_t best, gsl_vector * xc,
-							 gsl_multimin_function * f);
+                             size_t best, gsl_vector * xc,
+                             gsl_multimin_function * f);
 static int  compute_center(const sasimplex_state_t * state,
                            gsl_vector * center);
 static double compute_size(sasimplex_state_t * state,
@@ -110,23 +110,23 @@ static int  sasimplex_set(void *vstate, gsl_multimin_function * f,
                           const gsl_vector * x,
                           double *size, const gsl_vector * step_size);
 static int  sasimplex_onestep(void *vstate, gsl_multimin_function * f,
-							  gsl_vector * x, double *size, double *fval);
-static size_t vector_min_index(const gsl_vector *v);
-static inline double sasimplex_size(sasimplex_state_t *state);
+                              gsl_vector * x, double *size, double *fval);
+static size_t vector_min_index(const gsl_vector * v);
+static inline double sasimplex_size(sasimplex_state_t * state);
 static inline double constrain_value(double x, double lo, double hi);
-static void constrain_vector(gsl_vector *v, const gsl_vector *lbound,
-                                   const gsl_vector *ubound);
-int constrain_simplex(gsl_matrix *x1, 
-                      gsl_vector *fvals,
-                      gsl_vector *lbound,
-                      gsl_vector *ubound,
-                      gsl_multimin_function *f);
-static int expand_around_best(sasimplex_state_t *state, gsl_multimin_function * func);
-static void sasimplex_sanityCheck(const sasimplex_state_t *state,
-								  const char *file, int lineno,
-								  const char *func);
+static void constrain_vector(gsl_vector * v, const gsl_vector * lbound,
+                             const gsl_vector * ubound);
+int         constrain_simplex(gsl_matrix * x1,
+                              gsl_vector * fvals,
+                              gsl_vector * lbound,
+                              gsl_vector * ubound, gsl_multimin_function * f);
+static inline int expand_around_best(sasimplex_state_t * state,
+                                     gsl_multimin_function * func);
+static void sasimplex_sanityCheck(const sasimplex_state_t * state,
+                                  const char *file, int lineno,
+                                  const char *func);
 static void dostacktrace(const char *file, int line, const char *func,
-						 FILE * ofp);
+                         FILE * ofp);
 
 /** The state of the minimizer */
 struct sasimplex_state_t {
@@ -143,7 +143,7 @@ struct sasimplex_state_t {
     double      S2;
     double      temperature;    /* increase to flatten surface */
     double      bestEver;       /* best func val ever seen */
-	unsigned    seedSet;        /* 0 initially; 1 after seed is set */
+    unsigned    seedSet;        /* 0 initially; 1 after seed is set */
     unsigned    seed;           /* for random number generator */
 };
 
@@ -160,8 +160,8 @@ const       gsl_multimin_fminimizer_type
     * gsl_multimin_fminimizer_sasimplex = &sasimplex_type;
 
 static void dostacktrace(const char *file, int line, const char *func,
-						 FILE * ofp) {
-	enum {CALLSTACK_SIZE=128};
+                         FILE * ofp) {
+    enum { CALLSTACK_SIZE = 128 };
     void       *callstack[CALLSTACK_SIZE];
     int         nsymbols = backtrace(callstack, CALLSTACK_SIZE);
 
@@ -170,87 +170,86 @@ static void dostacktrace(const char *file, int line, const char *func,
     backtrace_symbols_fd(callstack, nsymbols, fileno(ofp));
 }
 
-static void sasimplex_sanityCheck(const sasimplex_state_t *state,
-							 const char *file, int lineno,
-							 const char *func) {
+static void sasimplex_sanityCheck(const sasimplex_state_t * state,
+                                  const char *file, int lineno,
+                                  const char *func) {
 #ifndef NDEBUG
-	REQUIRE(state->x1 != NULL, file, lineno, func);
-	REQUIRE(state->f1 != NULL, file, lineno, func);
-	REQUIRE(state->ws1 != NULL, file, lineno, func);
-	REQUIRE(state->ws2 != NULL, file, lineno, func);
-	REQUIRE(state->center != NULL, file, lineno, func);
-	REQUIRE(state->delta != NULL, file, lineno, func);
-	REQUIRE(state->center != NULL, file, lineno, func);
+    REQUIRE(state->x1 != NULL, file, lineno, func);
+    REQUIRE(state->f1 != NULL, file, lineno, func);
+    REQUIRE(state->ws1 != NULL, file, lineno, func);
+    REQUIRE(state->ws2 != NULL, file, lineno, func);
+    REQUIRE(state->center != NULL, file, lineno, func);
+    REQUIRE(state->delta != NULL, file, lineno, func);
+    REQUIRE(state->center != NULL, file, lineno, func);
 
-	/* either both NULL or both non-NULL */
-	REQUIRE((state->lbound==NULL) ==  (state->ubound==NULL),
-			file, lineno, func);
+    /* either both NULL or both non-NULL */
+    REQUIRE((state->lbound == NULL) == (state->ubound == NULL),
+            file, lineno, func);
 
-	size_t i, j;
-	size_t n = state->center->size;
-	REQUIRE(n>0, file, lineno, func);
+    size_t      i, j;
+    size_t      n = state->center->size;
+    REQUIRE(n > 0, file, lineno, func);
 
-	if(state->lbound != NULL) {
-		double lb, ub, x;
-		/* Is simplex within bounds? */
-		for(i=0; i <= n; ++i) {
-			gsl_vector_const_view row = gsl_matrix_const_row(state->x1, i);
-			for(j=0; j < n; ++j) {
+    if(state->lbound != NULL) {
+        double      lb, ub, x;
+        /* Is simplex within bounds? */
+        for(i = 0; i <= n; ++i) {
+            gsl_vector_const_view row = gsl_matrix_const_row(state->x1, i);
+            for(j = 0; j < n; ++j) {
                 lb = gsl_vector_get(state->lbound, j);
                 ub = gsl_vector_get(state->ubound, j);
-				x  = gsl_vector_get(&row.vector, j);
-				REQUIRE(lb <= x, file, lineno, func);
-				REQUIRE(x <= ub, file, lineno, func);
-			}
-		}
+                x = gsl_vector_get(&row.vector, j);
+                REQUIRE(lb <= x, file, lineno, func);
+                REQUIRE(x <= ub, file, lineno, func);
+            }
+        }
 
-		/* Is center within bounds? */
-		for(j=0; j < n; ++j) {
-			lb = gsl_vector_get(state->lbound, j);
-			ub = gsl_vector_get(state->ubound, j);
-			lb -= 2.0*DBL_EPSILON;
-			ub += 2.0*DBL_EPSILON;
-			x  = gsl_vector_get(state->center, j);
-			if(x < lb) {
-				printf("%s:%d:%s: x=%lf < %lf; diff=%le]\n",
-					   __FILE__,__LINE__,__func__,x, lb, lb-x);
-			}else if(x > ub) {
-				printf("%s:%d:%s: x=%lf > %lf; diff=%le]\n",
-					   __FILE__,__LINE__,__func__,x, ub, x-ub);
-			}
-			REQUIRE(lb <= x, file, lineno, func);
-			REQUIRE(x <= ub, file, lineno, func);
-		}
-	}
+        /* Is center within bounds? */
+        for(j = 0; j < n; ++j) {
+            lb = gsl_vector_get(state->lbound, j);
+            ub = gsl_vector_get(state->ubound, j);
+            lb -= 2.0 * DBL_EPSILON;
+            ub += 2.0 * DBL_EPSILON;
+            x = gsl_vector_get(state->center, j);
+            if(x < lb) {
+                printf("%s:%d:%s: x=%lf < %lf; diff=%le]\n",
+                       __FILE__, __LINE__, __func__, x, lb, lb - x);
+            } else if(x > ub) {
+                printf("%s:%d:%s: x=%lf > %lf; diff=%le]\n",
+                       __FILE__, __LINE__, __func__, x, ub, x - ub);
+            }
+            REQUIRE(lb <= x, file, lineno, func);
+            REQUIRE(x <= ub, file, lineno, func);
+        }
+    }
 
-	/* Is center really the center? */
-	(void) compute_center(state, state->ws1);
-    double absdiff=0.0, absmax=0.0;
+    /* Is center really the center? */
+    (void) compute_center(state, state->ws1);
+    double      absdiff = 0.0, absmax = 0.0;
     const double reltol = 0.01;
-	for(j=0; j < n; ++j) {
-		double x = gsl_vector_get(state->ws1, j);
-		double y = gsl_vector_get(state->center, j);
-        absdiff += fabs(x-y);
+    for(j = 0; j < n; ++j) {
+        double      x = gsl_vector_get(state->ws1, j);
+        double      y = gsl_vector_get(state->center, j);
+        absdiff += fabs(x - y);
         absmax += fmax(fabs(x), fabs(y));
-	}
+    }
     if(absdiff > absmax * reltol) {
         printf("absdiff=%le absmax=%le relerr=%le > %le\n",
-               absdiff, absmax, absdiff/absmax, reltol);
+               absdiff, absmax, absdiff / absmax, reltol);
         fflush(stdout);
     }
     REQUIRE(absdiff <= absmax * reltol, file, lineno, func);
 #endif
 }
 
-
 void sasimplex_print(gsl_multimin_fminimizer * minimizer) {
     sasimplex_state_t *state = minimizer->state;
-    size_t n = state->center->size; /* dimension of state vector */
-    size_t i, j;
+    size_t      n = state->center->size;    /* dimension of state vector */
+    size_t      i, j;
 
     printf("Simplex\n");
-    for(i=0; i <= n; ++i) {
-        for(j=0; j < n; ++j)
+    for(i = 0; i <= n; ++i) {
+        for(j = 0; j < n; ++j)
             printf(" %le", gsl_matrix_get(state->x1, i, j));
         printf(": %le\n", gsl_vector_get(state->f1, i));
     }
@@ -258,13 +257,13 @@ void sasimplex_print(gsl_multimin_fminimizer * minimizer) {
     printf(" bestEver=%lf\n", state->bestEver);
     if(state->lbound != NULL) {
         printf(" upper bound:");
-        for(i=0; i < n; ++i) 
+        for(i = 0; i < n; ++i)
             printf(" %lf", gsl_vector_get(state->ubound, i));
         putchar('\n');
     }
     if(state->ubound != NULL) {
         printf(" lower bound:");
-        for(i=0; i < n; ++i) 
+        for(i = 0; i < n; ++i)
             printf(" %lf", gsl_vector_get(state->lbound, i));
         putchar('\n');
     }
@@ -285,26 +284,26 @@ void sasimplex_print(gsl_multimin_fminimizer * minimizer) {
  * returns the index of the 1st NaN it encounters. This causes the
  * simplex algorithm to gravitate toward regions of the state space
  * where the function value is undefined.
- * 
+ *
  * The present code uses gsl_vector_get to retrieve values and changes
  * the lower bound of the loop from 0 to 1.
  */
-static size_t vector_min_index(const gsl_vector *v) {
-  const size_t N = v->size ;
+static size_t vector_min_index(const gsl_vector * v) {
+    const size_t N = v->size;
 
-  double min = gsl_vector_get(v, 0);
-  size_t imin = 0;
-  size_t i;
+    double      min = gsl_vector_get(v, 0);
+    size_t      imin = 0;
+    size_t      i;
 
-  for (i = 1; i < N; i++)  {
-      double x = gsl_vector_get(v, i);
-      if (x < min) {
-          min = x;
-          imin = i;
-      }
-  }
+    for(i = 1; i < N; i++) {
+        double      x = gsl_vector_get(v, i);
+        if(x < min) {
+            min = x;
+            imin = i;
+        }
+    }
 
-  return imin;
+    return imin;
 }
 
 /** Set temperature. */
@@ -317,12 +316,12 @@ sasimplex_set_temp(gsl_multimin_fminimizer * minimizer, double temperature) {
 
 /** Test convergence based on relative spread of function values */
 int
-sasimplex_converged(gsl_multimin_fminimizer * minimizer, double tol_fval,
-                    double tol_size) {
+sasimplex_converged(gsl_multimin_fminimizer * minimizer, double *size,
+                    double tol_fval, double tol_size) {
     sasimplex_state_t *state = minimizer->state;
 
-    double best, worst, dy, tol1;
-    int status=GSL_ESANITY;
+    double      best, worst, dy, tol1;
+    int         status = GSL_ESANITY;
 
 #if 0
     gsl_vector_minmax(state->f1, &best, &worst);
@@ -335,20 +334,20 @@ sasimplex_converged(gsl_multimin_fminimizer * minimizer, double tol_fval,
     tol1 = 4.0 * tol_fval * (fabs(worst) + fabs(best)) + tol_fval;
     dy = fabs(worst - best);
 
-    int fvals_eq = (dy < tol1 ? 1 : 0);
-
-    if( sasimplex_size(state) < tol_size ){
+    int         fvals_eq = (dy < tol1 ? 1 : 0);
+    *size = sasimplex_size(state);
+    if(*size < tol_size) {
         if(fvals_eq) {
-            status =  GSL_SUCCESS;
-        }else{
+            status = GSL_SUCCESS;
+        } else {
             /* stuck */
-            status =  GSL_ETOLF;
+            status = GSL_ETOLF;
         }
-    }else{
+    } else {
         if(fvals_eq) {
             /* flat objective function */
             status = GSL_ETOLX;
-        }else{
+        } else {
             /* keep going */
             status = GSL_CONTINUE;
         }
@@ -376,16 +375,16 @@ static inline double constrain_value(double x, double lo, double hi) {
 }
 
 /** Contrain all entries of v to lie between lower and upper bounds */
-static void constrain_vector(gsl_vector *v,
-                                   const gsl_vector *lbound,
-                                   const gsl_vector *ubound) {
-    size_t i;
-    assert( (lbound && ubound) || ((!lbound) && (!ubound)) );
-    if( lbound != NULL) {
-        for(i=0; i < v->size; ++i) {
-            double val = gsl_vector_get(v, i);
-            double lb = gsl_vector_get(lbound, i);
-            double ub = gsl_vector_get(ubound, i);
+static void constrain_vector(gsl_vector * v,
+                             const gsl_vector * lbound,
+                             const gsl_vector * ubound) {
+    size_t      i;
+    assert((lbound && ubound) || ((!lbound) && (!ubound)));
+    if(lbound != NULL) {
+        for(i = 0; i < v->size; ++i) {
+            double      val = gsl_vector_get(v, i);
+            double      lb = gsl_vector_get(lbound, i);
+            double      ub = gsl_vector_get(ubound, i);
             val = constrain_value(val, lb, ub);
             gsl_vector_set(v, i, val);
         }
@@ -407,52 +406,50 @@ static void constrain_vector(gsl_vector *v,
  *
  * Function returns the function value at the new vertex.
  */
-static double
-trial_point(const double p,
-            gsl_vector *trial, /* to hold new vertex */
-            const gsl_vector *h,   /* highest point in simplex */
-            const gsl_vector *c,   /* centroid of entire simplex */
-            const gsl_vector *lbound, /* lower bound */
-            const gsl_vector *ubound, /* lower bound */
-            const gsl_multimin_function * f) {
+static double trial_point(const double p, gsl_vector * trial,   /* to hold new vertex */
+                          const gsl_vector * h, /* highest point in simplex */
+                          const gsl_vector * c, /* centroid of entire simplex */
+                          const gsl_vector * lbound,    /* lower bound */
+                          const gsl_vector * ubound,    /* lower bound */
+                          const gsl_multimin_function * f) {
 
     /* n is the dimension of the state space */
     const size_t n = h->size;
 
-	/*
-	 * We want to calculate a trial vertex as
-	 *
-	 *    trial = (1-p)*m + p*h = m - p*(m - h)
-	 *
-	 * where h is the vector defining the simplex point with
-	 * highest function value and m is the centroid of the
-	 * remaining points. However, the present code calculates c,
-	 * the center of the entire simplex, not excluding the highest
-	 * point. The formula above for "trial" is equivalent to
-	 *
-	 *    trial = (1-a)*c + a*h = c - a*(c - h)
-	 *
-	 * where 
-	 *
-	 *      a = ((n+1)*p - 1)/n
-	 */
-	double      a = ((n+1)*p - 1.0)/n;
-    size_t i;
-    int ineq_constraint = 0;
+    /*
+     * We want to calculate a trial vertex as
+     *
+     *    trial = (1-p)*m + p*h = m - p*(m - h)
+     *
+     * where h is the vector defining the simplex point with
+     * highest function value and m is the centroid of the
+     * remaining points. However, the present code calculates c,
+     * the center of the entire simplex, not excluding the highest
+     * point. The formula above for "trial" is equivalent to
+     *
+     *    trial = (1-a)*c + a*h = c - a*(c - h)
+     *
+     * where
+     *
+     *      a = ((n+1)*p - 1)/n
+     */
+    double      a = ((n + 1) * p - 1.0) / n;
+    size_t      i;
+    int         ineq_constraint = 0;
 
-    assert( (lbound && ubound) || ((!lbound) && (!ubound)) );
+    assert((lbound && ubound) || ((!lbound) && (!ubound)));
 
-    if( lbound != NULL)
+    if(lbound != NULL)
         ineq_constraint = 1;
 
-	/* trial = (1-a)*c + a*h */
-    for(i=0; i<n; ++i) {
-        double cval = gsl_vector_get(c, i);
-        double hval = gsl_vector_get(h, i);
-        double try = cval - a*(cval-hval);
+    /* trial = (1-a)*c + a*h */
+    for(i = 0; i < n; ++i) {
+        double      cval = gsl_vector_get(c, i);
+        double      hval = gsl_vector_get(h, i);
+        double      try = cval - a * (cval - hval);
         if(ineq_constraint) {
-            double lb = gsl_vector_get(lbound, i);
-            double ub = gsl_vector_get(ubound, i);
+            double      lb = gsl_vector_get(lbound, i);
+            double      ub = gsl_vector_get(ubound, i);
             try = constrain_value(try, lb, ub);
             assert(try >= lb);
             assert(try <= ub);
@@ -460,18 +457,18 @@ trial_point(const double p,
         gsl_vector_set(trial, i, try);
     }
 #if 0
-	gsl_vector_memcpy(trial, c);
-	gsl_blas_dscal(1.0-a, trial);
-	gsl_blas_daxpy(a, h, trial);
+    gsl_vector_memcpy(trial, c);
+    gsl_blas_dscal(1.0 - a, trial);
+    gsl_blas_daxpy(a, h, trial);
 #endif
 
     /* new function value */
-    double newval = GSL_MULTIMIN_FN_EVAL(f, trial);
+    double      newval = GSL_MULTIMIN_FN_EVAL(f, trial);
 
 #ifdef DEBUGGING
-	printf("%s:%d:%s: p=%lf a=%lf \n  trial:",
-		   __FILE__, __LINE__, __func__, p, a);
-    for(i=0; i<n; ++i)
+    printf("%s:%d:%s: p=%lf a=%lf \n  trial:",
+           __FILE__, __LINE__, __func__, p, a);
+    for(i = 0; i < n; ++i)
         printf(" %lf", gsl_vector_get(trial, i));
     printf(": f=%lf\n", newval);
 #endif
@@ -514,52 +511,31 @@ update_point(sasimplex_state_t * state, size_t i,
 
     gsl_matrix_set_row(state->x1, i, x);
     gsl_vector_set(state->f1, i, val);
-	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
+    sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
 }
 
-static int
-expand_around_best(sasimplex_state_t *state, gsl_multimin_function * func) {
-    gsl_matrix *x1 = state->x1;
-    gsl_vector *f1 = state->f1;
-    gsl_vector *xtemp = state->ws1;
-	int status = GSL_SUCCESS;
-    size_t i, best = vector_min_index(f1);
-	size_t j=0;
-	const double scale = 0.1;
+static inline int
+expand_around_best(sasimplex_state_t * state, gsl_multimin_function * func) {
+    size_t      best = vector_min_index(state->f1);
+    double      inflateBy = 200.0;
+    int         status;
 
-	for(i=0; i < x1->size1; ++i) {
-		if(i == best)
-			continue;
-		gsl_matrix_get_row(xtemp, x1, i);
-		double x = gsl_vector_get(xtemp, j);
-		x += scale * gsl_vector_get(state->step_size, j);
-		gsl_vector_set(xtemp, j, x);
-		gsl_matrix_set_row(x1, i, xtemp);
-		++j;
-	}
+    status = contract_by_best(state, inflateBy, best, state->ws1, func);
+    if(status != GSL_SUCCESS)
+        GSL_ERROR("contract_by_best failed", status);
 
-    status = constrain_simplex(state->x1, state->f1, state->lbound,
-							   state->ubound, func);
-    if(status != GSL_SUCCESS) 
-        GSL_ERROR("constrain_simplex failed", GSL_EFAILED);
-    compute_center(state, state->center);
-    (void) compute_size(state, state->center);
-	double currBest = gsl_vector_min(state->f1);
-	if(currBest < state->bestEver)
-		state->bestEver = currBest;
-	return status;
+    return status;
 }
 
 /*
- * Function contracts the simplex in respect to best valued
- * corner. That is, all corners besides the best corner are
- * moved. (This function is rarely called in practice, since it is the
- * last choice, hence not optimised - BJG)
+ * Function contracts the simplex toward current minimum. That is, all
+ * corners besides the best corner are moved. (This function is rarely
+ * called in practice, since it is the last choice, hence not
+ * optimised - BJG)
  */
 static int
 contract_by_best(sasimplex_state_t * state, double delta,
-				 size_t best, gsl_vector * xc,
-				 gsl_multimin_function * f) {
+                 size_t best, gsl_vector * xc, gsl_multimin_function * f) {
 
     /* the xc vector is simply work space here */
     gsl_matrix *x1 = state->x1;
@@ -572,9 +548,9 @@ contract_by_best(sasimplex_state_t * state, double delta,
             continue;
         double      newval;
         for(j = 0; j < x1->size2; j++) {
-            double xbest = gsl_matrix_get(x1, best, j);
-            double xi  = gsl_matrix_get(x1, i, j);
-            newval = xbest + delta*(xi - xbest);
+            double      xbest = gsl_matrix_get(x1, best, j);
+            double      xi = gsl_matrix_get(x1, i, j);
+            newval = xbest + delta * (xi - xbest);
             gsl_matrix_set(x1, i, j, newval);
         }
 
@@ -584,21 +560,26 @@ contract_by_best(sasimplex_state_t * state, double delta,
         gsl_vector_set(f1, i, newval);
 
         if(gsl_finite(newval)) {
-            if(newval < state->bestEver) {
+            if(newval < state->bestEver)
                 state->bestEver = newval;
-            }
-        }else{
-            /* Bad function value: finish contraction (and do not
-             * abort) to allow the user to handle the situation */
-            status = GSL_EBADFUNC;
-        }
+        }else
+            GSL_ERROR("bad function value", GSL_EBADFUNC);
+    }
+
+    if(delta > 1.0) {
+        status = constrain_simplex(state->x1, state->f1, state->lbound,
+                                   state->ubound, f);
+        if(status != GSL_SUCCESS)
+            GSL_ERROR("constrain_simplex failed", status);
+        
     }
 
     /* We need to update the centre and size as well */
     compute_center(state, state->center);
     compute_size(state, state->center);
 
-	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
+    sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
+
     return status;
 }
 
@@ -623,15 +604,14 @@ compute_center(const sasimplex_state_t * state, gsl_vector * center) {
         gsl_vector_const_view row = gsl_matrix_const_row(x1, i);
         gsl_blas_daxpy(1.0, &row.vector, center);
     }
-    gsl_blas_dscal(1.0/P, center);
+    gsl_blas_dscal(1.0 / P, center);
     return GSL_SUCCESS;
 }
 
-static inline double
-sasimplex_size(sasimplex_state_t *state) {
+static inline double sasimplex_size(sasimplex_state_t * state) {
     double      S2 = state->S2;
 
-    if(S2 > 0.0) 
+    if(S2 > 0.0)
         return sqrt(S2);
     /* recompute if accumulated error has made size invalid */
     return compute_size(state, state->center);
@@ -639,9 +619,9 @@ sasimplex_size(sasimplex_state_t *state) {
 
 static double
 compute_size(sasimplex_state_t * state, const gsl_vector * center) {
-    /* calculates simplex size as rms sum of length of vectors 
-     * from simplex center to corner points:     
-     * 
+    /* calculates simplex size as rms sum of length of vectors
+     * from simplex center to corner points:
+     *
      * sqrt( sum ( || y - y_middlepoint ||^2 ) / n )
      */
     gsl_vector *s = state->ws1;
@@ -675,7 +655,7 @@ static int sasimplex_alloc(void *vstate, size_t n) {
         GSL_ERROR("invalid number of parameters specified", GSL_EINVAL);
     }
 
-    state->x1 = gsl_matrix_alloc(n+1, n);
+    state->x1 = gsl_matrix_alloc(n + 1, n);
     if(state->x1 == NULL) {
         GSL_ERROR("failed to allocate space for x1", GSL_ENOMEM);
     }
@@ -771,33 +751,33 @@ static void sasimplex_free(void *vstate) {
 
 /** Set lower and upper bounds on state vector */
 int sasimplex_set_bounds(gsl_multimin_fminimizer * minimizer,
-                         const gsl_vector *lbound,
-                         const gsl_vector *ubound,
-                         const gsl_vector *step_size) {
+                         const gsl_vector * lbound,
+                         const gsl_vector * ubound,
+                         const gsl_vector * step_size) {
     sasimplex_state_t *state = minimizer->state;
-	int status = GSL_SUCCESS;
+    int         status = GSL_SUCCESS;
 
-    if(lbound==NULL || ubound==NULL)
+    if(lbound == NULL || ubound == NULL)
         GSL_ERROR("NULL vector passed to sasimplex_set_bounds", GSL_EDOM);
-                  
+
     state->lbound = gsl_vector_alloc(lbound->size);
     state->ubound = gsl_vector_alloc(lbound->size);
-    if(state->lbound==NULL || state->ubound==NULL)
+    if(state->lbound == NULL || state->ubound == NULL)
         GSL_ERROR("bad gsl_vector_alloc", GSL_ENOMEM);
 
     gsl_vector_memcpy(state->lbound, lbound);
     gsl_vector_memcpy(state->ubound, ubound);
 
     status = constrain_simplex(state->x1, state->f1, state->lbound,
-							   state->ubound, minimizer->f);
-    if(status != GSL_SUCCESS) 
-        GSL_ERROR("constrain_simplex failed", GSL_EFAILED);
+                               state->ubound, minimizer->f);
+    if(status != GSL_SUCCESS)
+        GSL_ERROR("constrain_simplex failed", status);
 
     compute_center(state, state->center);
     (void) compute_size(state, state->center);
     state->bestEver = gsl_vector_min(state->f1);
 
-	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
+    sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
     return status;
 }
 
@@ -805,24 +785,23 @@ int sasimplex_set_bounds(gsl_multimin_fminimizer * minimizer,
  * Make sure simplex points (in matrix x1) are between lbound and
  * ubound and adjust function values (in vector fvals).
  */
-int constrain_simplex(gsl_matrix *x1, 
-                      gsl_vector *fvals,
-                      gsl_vector *lbound,
-                      gsl_vector *ubound,
-                      gsl_multimin_function *f) {
+int constrain_simplex(gsl_matrix * x1,
+                      gsl_vector * fvals,
+                      gsl_vector * lbound,
+                      gsl_vector * ubound, gsl_multimin_function * f) {
 
-    if(lbound==NULL && ubound==NULL)
+    if(lbound == NULL && ubound == NULL)
         return 0;
 
     assert(lbound && ubound);
-    
-    size_t i, npts = fvals->size;
 
-    for(i=0; i < npts; ++i) {
+    size_t      i, npts = fvals->size;
+
+    for(i = 0; i < npts; ++i) {
         gsl_vector_view x = gsl_matrix_row(x1, i);
         constrain_vector(&x.vector, lbound, ubound);
-        double val = GSL_MULTIMIN_FN_EVAL(f, &x.vector);
-        if(!gsl_finite(val)) 
+        double      val = GSL_MULTIMIN_FN_EVAL(f, &x.vector);
+        if(!gsl_finite(val))
             GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
         gsl_vector_set(fvals, i, val);
     }
@@ -838,7 +817,7 @@ static inline double ran_uni(unsigned *seed) {
 
 /**
  * Random variates drawn from exponential distribution with given
- * mean. 
+ * mean.
  */
 static inline double ran_expn(unsigned *seed, double mean) {
     double      u;
@@ -854,16 +833,16 @@ void sasimplex_random_seed(gsl_multimin_fminimizer * minimizer, unsigned seed) {
     sasimplex_state_t *state = minimizer->state;
 
     state->seed = seed;
-	state->seedSet = 1;
+    state->seedSet = 1;
 }
 
 /*
  * Measure vertical scale of simplex as the difference between the
  * current minimum function value and the smallest value ever seen.
  */
-double sasimplex_vertical_scale(gsl_multimin_fminimizer *minimizer) {
+double sasimplex_vertical_scale(gsl_multimin_fminimizer * minimizer) {
     sasimplex_state_t *state = minimizer->state;
-    double currBest = gsl_vector_min(state->f1);
+    double      currBest = gsl_vector_min(state->f1);
 
     assert(state->bestEver < DBL_MAX);
     assert(currBest >= state->bestEver);
@@ -879,7 +858,7 @@ double sasimplex_vertical_scale(gsl_multimin_fminimizer *minimizer) {
     assert(currBest > state->bestEver);
 #endif
 
-    return currBest  - state->bestEver;
+    return currBest - state->bestEver;
 }
 
 static int
@@ -891,19 +870,19 @@ sasimplex_set(void *vstate, gsl_multimin_function * func,
     sasimplex_state_t *state = (sasimplex_state_t *) vstate;
     gsl_vector *xtemp = state->ws1;
 
-    if(xtemp->size != x->size) 
+    if(xtemp->size != x->size)
         GSL_ERROR("incompatible size of x", GSL_EINVAL);
 
-    if(xtemp->size != step_size->size) 
+    if(xtemp->size != step_size->size)
         GSL_ERROR("incompatible size of step_size", GSL_EINVAL);
 
     status = gsl_vector_memcpy(state->step_size, step_size);
-    if(status != 0) 
+    if(status != 0)
         GSL_ERROR("gsl_vector_memcpy failed", GSL_EFAILED);
 
     /* first point is x0 */
     val = GSL_MULTIMIN_FN_EVAL(func, x);
-    if(!gsl_finite(val)) 
+    if(!gsl_finite(val))
         GSL_ERROR("non-finite function value", GSL_EBADFUNC);
 
     gsl_matrix_set_row(state->x1, 0, x);
@@ -915,7 +894,7 @@ sasimplex_set(void *vstate, gsl_multimin_function * func,
     /* following points are initialized to x0 + step_size */
     for(i = 0; i < x->size; i++) {
         status = gsl_vector_memcpy(xtemp, &x0.vector);
-        if(status != 0) 
+        if(status != 0)
             GSL_ERROR("gsl_vector_memcpy failed", GSL_EFAILED);
 
         {
@@ -924,21 +903,21 @@ sasimplex_set(void *vstate, gsl_multimin_function * func,
             gsl_vector_set(xtemp, i, xi);
         }
         val = GSL_MULTIMIN_FN_EVAL(func, xtemp);
-        if(!gsl_finite(val)) 
+        if(!gsl_finite(val))
             GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
         gsl_matrix_set_row(state->x1, i + 1, xtemp);
         gsl_vector_set(state->f1, i + 1, val);
     }
 
     status = constrain_simplex(state->x1, state->f1, state->lbound,
-							   state->ubound, func);
-    if(status != GSL_SUCCESS) 
+                               state->ubound, func);
+    if(status != GSL_SUCCESS)
         GSL_ERROR("constrain_simplex failed", GSL_EFAILED);
     compute_center(state, state->center);
     *size = compute_size(state, state->center);
     state->bestEver = gsl_vector_min(state->f1);
 
-	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
+    sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
     return status;
 }
 
@@ -967,16 +946,16 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * func,
     if(xc->size != x->size)
         GSL_ERROR("incompatible size of x", GSL_EINVAL);
 
-	/*
-	 * Constants from Eqn 4.1 of "Implementing the Nelder-Mead simplex
-	 * algorithm with adaptive parameters", by Fuchang Gao and Lixing
-	 * Han (Computational Optimization and Applications
-	 * 51(1):259-277, 2012).
-	 */
-	const double alpha = 1.0;
-	const double beta = 1.0 + 2.0/n;
-	const double gmma = 0.75 - 1.0/(2.0*n);
-	const double delta = 1.0 - 1.0/n;
+    /*
+     * Constants from Eqn 4.1 of "Implementing the Nelder-Mead simplex
+     * algorithm with adaptive parameters", by Fuchang Gao and Lixing
+     * Han (Computational Optimization and Applications
+     * 51(1):259-277, 2012).
+     */
+    const double alpha = 1.0;
+    const double beta = 1.0 + 2.0 / n;
+    const double gmma = 0.75 - 1.0 / (2.0 * n);
+    const double delta = 1.0 - 1.0 / n;
 
     /*
      * Find highest, second highest and lowest point. We need the
@@ -993,7 +972,7 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * func,
      */
     lo = 0;
     hi = 1;
-	ASSERT_SEED_SET(state);
+    ASSERT_SEED_SET(state);
     dlo = gsl_vector_get(fvec, lo) + ran_expn(&state->seed, temp);
     dhi = gsl_vector_get(fvec, hi) + ran_expn(&state->seed, temp);
 
@@ -1021,7 +1000,7 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * func,
     }
 
     /* simplex point with worst (largest) func value */
-	gsl_vector_const_view hvec = gsl_matrix_const_row(state->x1, hi);
+    gsl_vector_const_view hvec = gsl_matrix_const_row(state->x1, hi);
 
     /*
      * v is the true function value at the trial point and pv is the
@@ -1033,48 +1012,50 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * func,
      */
 
     /* reflection */
-	v = trial_point(-alpha, xc, &hvec.vector, state->center, state->lbound,
+    v = trial_point(-alpha, xc, &hvec.vector, state->center, state->lbound,
                     state->ubound, func);
     pv = v - ran_expn(&state->seed, temp);
 
-    if( pv < dlo ) {                          /* try expansion */
-        v2 = trial_point(-alpha*beta, xc2, &hvec.vector, state->center,
+    if(pv < dlo) {              /* try expansion */
+        v2 = trial_point(-alpha * beta, xc2, &hvec.vector, state->center,
                          state->lbound, state->ubound, func);
         pv2 = v2 - ran_expn(&state->seed, temp);
-        if(pv2 < pv) {                        /* accept expansion */
+        if(pv2 < pv) {          /* accept expansion */
 #ifdef DEBUGGING
             printf("%s:%d:%s: expansion\n", __FILE__, __LINE__, __func__);
 #endif
             update_point(state, hi, xc2, v2);
-        }else{                                  /* accept reflection */
+        } else {                /* accept reflection */
 #ifdef DEBUGGING
             printf("%s:%d:%s: reflection1\n", __FILE__, __LINE__, __func__);
 #endif
             update_point(state, hi, xc, v);
         }
-    }else if( pv < ds_hi ) {                  /* accept reflection */
+    } else if(pv < ds_hi) {     /* accept reflection */
         assert(dlo <= pv);
 #ifdef DEBUGGING
         printf("%s:%d:%s: reflection2\n", __FILE__, __LINE__, __func__);
 #endif
         update_point(state, hi, xc, v);
-    }else  if( pv < dhi ){                    /* try outside contraction */
+    } else if(pv < dhi) {       /* try outside contraction */
         assert(ds_hi <= pv);
-        v2 = trial_point(-alpha*gmma, xc2, &hvec.vector, state->center,
+        v2 = trial_point(-alpha * gmma, xc2, &hvec.vector, state->center,
                          state->lbound, state->ubound, func);
         pv2 = v2 - ran_expn(&state->seed, temp);
-        if(pv2 <= pv){                         /* accept outside contraction */
+        if(pv2 <= pv) {         /* accept outside contraction */
 #ifdef DEBUGGING
             printf("%s:%d:%s: o contract\n", __FILE__, __LINE__, __func__);
 #endif
             update_point(state, hi, xc2, v2);
-        }else{                                  /* shrink */
+        } else {                /* shrink */
 #ifdef DEBUGGING
             printf("%s:%d:%s: shrink1\n", __FILE__, __LINE__, __func__);
 #endif
             status = contract_by_best(state, delta, lo, xc, func);
+            if(status != GSL_SUCCESS)
+                GSL_ERROR("contract_by_best failed", status);
         }
-    }else{                                    /* try inside contraction */
+    } else {                    /* try inside contraction */
         assert(dhi <= pv || !gsl_finite(pv));
         /*
          * According to Gao and Han (3rd page), the inside contraction is
@@ -1086,25 +1067,27 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * func,
          *   center*(1-gmma)  + gmma*h
          *
          * This shouldn't matter, because Gao and Han (eqn 4.1) take
-         * alpha=1.  
+         * alpha=1.
          */
-        v2 = trial_point(alpha*gmma, xc2, &hvec.vector, state->center,
+        v2 = trial_point(alpha * gmma, xc2, &hvec.vector, state->center,
                          state->lbound, state->ubound, func);
         pv2 = v2 - ran_expn(&state->seed, temp);
-        if(pv2 < dhi) {                      /* accept inside contraction */
+        if(pv2 < dhi) {         /* accept inside contraction */
 #ifdef DEBUGGING
             printf("%s:%d:%s: i contract\n", __FILE__, __LINE__, __func__);
 #endif
             update_point(state, hi, xc2, v2);
-        }else{                                /* shrink */
+        } else {                /* shrink */
 #ifdef DEBUGGING
             printf("%s:%d:%s: shrink2\n", __FILE__, __LINE__, __func__);
 #endif
             status = contract_by_best(state, delta, lo, xc, func);
+            if(status != GSL_SUCCESS)
+                GSL_ERROR("contract_by_best failed", status);
         }
     }
 
-    if(status != GSL_SUCCESS) 
+    if(status != GSL_SUCCESS)
         GSL_ERROR("contraction failed", GSL_EFAILED);
 
     /* Return lowest point of simplex as x. */
@@ -1114,28 +1097,27 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * func,
 
     if(*fval < state->bestEver) {
         state->bestEver = *fval;
-	}
+    }
 
     *size = sasimplex_size(state);
 
-	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
+    sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
     return status;
 }
 
 int
 sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
                           int rotate, gsl_vector * lo,
-                          gsl_vector * hi,
-                          const gsl_vector * step_size) {
+                          gsl_vector * hi, const gsl_vector * step_size) {
     sasimplex_state_t *state = minimizer->state;
     gsl_multimin_function *func = minimizer->f;
     double      val;
     size_t      i, j;
     gsl_vector *xtemp = state->ws1;
     size_t      stateDim = xtemp->size;
-	int status = GSL_SUCCESS;
+    int         status = GSL_SUCCESS;
 
-	ASSERT_SEED_SET(state);
+    ASSERT_SEED_SET(state);
     /*
      * Copy of point 0 of the simplex into xtemp.
      *
@@ -1166,10 +1148,10 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
             gsl_vector_set(xtemp, i, val);
         }
         gsl_matrix_set_row(state->x1, 0, xtemp);
-		gsl_vector_memcpy(minimizer->x, xtemp);
+        gsl_vector_memcpy(minimizer->x, xtemp);
         val = GSL_MULTIMIN_FN_EVAL(func, xtemp);
         if(!gsl_finite(val)) {
-			GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
+            GSL_ERROR("non-finite function value encountered", GSL_EBADFUNC);
         }
         gsl_vector_set(state->f1, 0, val);
     }
@@ -1219,8 +1201,8 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
             if(gsl_finite(val)) {
                 if(val < state->bestEver) {
                     state->bestEver = val;
-				}
-            }else{
+                }
+            } else {
                 GSL_ERROR("non-finite function value encountered",
                           GSL_EBADFUNC);
             }
@@ -1229,16 +1211,16 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
     }
 
     status = constrain_simplex(state->x1, state->f1, state->lbound,
-							   state->ubound, func);
-    if(status != GSL_SUCCESS) 
+                               state->ubound, func);
+    if(status != GSL_SUCCESS)
         GSL_ERROR("constrain_simplex failed", GSL_EFAILED);
 
     compute_center(state, state->center);
     (void) compute_size(state, state->center);
 
-	state->bestEver = gsl_vector_min(state->f1);
+    state->bestEver = gsl_vector_min(state->f1);
 
-	sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
+    sasimplex_sanityCheck(state, __FILE__, __LINE__, __func__);
     return GSL_SUCCESS;
 }
 
@@ -1249,15 +1231,12 @@ sasimplex_randomize_state(gsl_multimin_fminimizer * minimizer,
  * The function returns the value returned by the final iteration of
  * gsl_multimin_fminimizer_iterate.
  */
-int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
+int sasimplex_n_iterations(gsl_multimin_fminimizer * minimizer,
                            double *size,
                            double tol_fval,
                            double tol_size,
-                           int nItr,
-                           double temperature,
-                           int verbose) {
-    int itr=0, status;
-	sasimplex_state_t *state = minimizer->state;
+                           int nItr, double temperature, int verbose) {
+    int         itr = 0, status;
 
     sasimplex_set_temp(minimizer, temperature);
     if(verbose) {
@@ -1274,12 +1253,8 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
             break;
         }
 
-        *size = gsl_multimin_fminimizer_size(minimizer);
-#if 0
-        status = gsl_multimin_test_size(*size, tol_size);
-#else
-        status = sasimplex_converged(minimizer, tol_fval, tol_size);
-        switch(status) {
+        status = sasimplex_converged(minimizer, size, tol_fval, tol_size);
+        switch (status) {
         case GSL_SUCCESS:
             break;
         case GSL_ETOLX:
@@ -1288,10 +1263,10 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
             break;
         case GSL_ETOLF:
             /* stuck */
-			status = expand_around_best(state, minimizer->f);
-			if(status != GSL_SUCCESS) 
-				GSL_ERROR("expand_around_best failed", GSL_EFAILED);
-			status = GSL_CONTINUE;
+            status = expand_around_best(minimizer->state, minimizer->f);
+            if(status != GSL_SUCCESS)
+                GSL_ERROR("expand_around_best failed", GSL_EFAILED);
+            status = GSL_CONTINUE;
             break;
         case GSL_CONTINUE:
             break;
@@ -1301,18 +1276,15 @@ int sasimplex_n_iterations(gsl_multimin_fminimizer *minimizer,
                     __FILE__, __LINE__, __func__, status);
             GSL_ERROR("ILLEGAL STATUS", GSL_EFAILED);
         }
-               
-#endif
 
         if(verbose) {
             printf(" %5d %7.3f %8.3f %8.4f %8.4f %4d %s\n",
                    itr, minimizer->fval, *size,
                    sasimplex_vertical_scale(minimizer),
-                   temperature, status,
-                   gsl_strerror(status));
+                   temperature, status, gsl_strerror(status));
         }
         ++itr;
-    }while(status == GSL_CONTINUE && itr < nItr);
+    } while(status == GSL_CONTINUE && itr < nItr);
 
     return status;
-}    
+}
