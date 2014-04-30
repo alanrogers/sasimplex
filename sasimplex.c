@@ -53,8 +53,6 @@
  * This implementation uses n+1 corner points in the simplex.
  */
 
-#undef DEBUGGING
-
 #include "sasimplex.h"
 #include <stdio.h>
 #include <math.h>
@@ -464,14 +462,6 @@ static double trial_point(const double p, gsl_vector * trial,   /* to hold new v
 
     /* new function value */
     double      newval = GSL_MULTIMIN_FN_EVAL(f, trial);
-
-#ifdef DEBUGGING
-    printf("%s:%d:%s: p=%lf a=%lf \n  trial:",
-           __FILE__, __LINE__, __func__, p, a);
-    for(i = 0; i < n; ++i)
-        printf(" %lf", gsl_vector_get(trial, i));
-    printf(": f=%lf\n", newval);
-#endif
 
     return newval;
 }
@@ -1021,21 +1011,12 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * func,
                          state->lbound, state->ubound, func);
         pv2 = v2 - ran_expn(&state->seed, temp);
         if(pv2 < pv) {          /* accept expansion */
-#ifdef DEBUGGING
-            printf("%s:%d:%s: expansion\n", __FILE__, __LINE__, __func__);
-#endif
             update_point(state, hi, xc2, v2);
         } else {                /* accept reflection */
-#ifdef DEBUGGING
-            printf("%s:%d:%s: reflection1\n", __FILE__, __LINE__, __func__);
-#endif
             update_point(state, hi, xc, v);
         }
     } else if(pv < ds_hi) {     /* accept reflection */
         assert(dlo <= pv);
-#ifdef DEBUGGING
-        printf("%s:%d:%s: reflection2\n", __FILE__, __LINE__, __func__);
-#endif
         update_point(state, hi, xc, v);
     } else if(pv < dhi) {       /* try outside contraction */
         assert(ds_hi <= pv);
@@ -1043,14 +1024,8 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * func,
                          state->lbound, state->ubound, func);
         pv2 = v2 - ran_expn(&state->seed, temp);
         if(pv2 <= pv) {         /* accept outside contraction */
-#ifdef DEBUGGING
-            printf("%s:%d:%s: o contract\n", __FILE__, __LINE__, __func__);
-#endif
             update_point(state, hi, xc2, v2);
         } else {                /* shrink */
-#ifdef DEBUGGING
-            printf("%s:%d:%s: shrink1\n", __FILE__, __LINE__, __func__);
-#endif
             status = contract_by_best(state, delta, lo, xc, func);
             if(status != GSL_SUCCESS)
                 GSL_ERROR("contract_by_best failed", status);
@@ -1073,14 +1048,8 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * func,
                          state->lbound, state->ubound, func);
         pv2 = v2 - ran_expn(&state->seed, temp);
         if(pv2 < dhi) {         /* accept inside contraction */
-#ifdef DEBUGGING
-            printf("%s:%d:%s: i contract\n", __FILE__, __LINE__, __func__);
-#endif
             update_point(state, hi, xc2, v2);
         } else {                /* shrink */
-#ifdef DEBUGGING
-            printf("%s:%d:%s: shrink2\n", __FILE__, __LINE__, __func__);
-#endif
             status = contract_by_best(state, delta, lo, xc, func);
             if(status != GSL_SUCCESS)
                 GSL_ERROR("contract_by_best failed", status);
