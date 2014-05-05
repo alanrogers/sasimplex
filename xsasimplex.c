@@ -183,7 +183,7 @@ int main(void) {
 		}
 	}
 
-	printf("True minimum: (%lf, %lf)\n", par[0], par[1]);
+	printf("Unconstrained minimum: (%lf, %lf)\n", par[0], par[1]);
     gsl_vector_free(x);
     gsl_vector_free(step_size);
     gsl_multimin_fminimizer_free(minimizer);
