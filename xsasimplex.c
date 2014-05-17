@@ -63,7 +63,7 @@ double my_f(const gsl_vector * v, void *params) {
 }
 #undef RUGGED
 
-#define STATEDIM 2
+#define STATEDIM 1
 
 int main(void) {
     double      par[STATEDIM];         /* minumum */
@@ -153,14 +153,17 @@ int main(void) {
                                             verbose);
 
             /* absErr is summed absolute error */
-            double      errx = gsl_vector_get(minimizer->x, 0) - par[0];
-            double      erry = gsl_vector_get(minimizer->x, 1) - par[1];
-            absErr = fabs(errx) + fabs(erry);
+			double err = 0;
+			for(i=0; i < STATEDIM; ++i) {
+				err = gsl_vector_get(minimizer->x, i) - par[i];
+				absErr += fabs(err);
+			}
 
             if(verbose) {
-                printf("try=%d x=%.4lf y=%.4f abserr=%.4le\n",
-                       try, gsl_vector_get(minimizer->x, 0),
-                       gsl_vector_get(minimizer->x, 1), absErr);
+                printf("try=%d", try);
+				for(i=0; i < STATEDIM; ++i)
+					printf(" x[%d]=%.4lf", i, gsl_vector_get(minimizer->x, i));
+				printf(" abserr=%.4le\n", absErr);
             }
             if(status != GSL_CONTINUE)
                 break;
@@ -183,7 +186,13 @@ int main(void) {
 		}
 	}
 
-	printf("Unconstrained minimum: (%lf, %lf)\n", par[0], par[1]);
+	printf("Unconstrained minimum: (");
+	for(i=0; i< STATEDIM; ++i) {
+		printf("%lf", par[i]);
+		if(i+1 < STATEDIM)
+			printf(", ");
+	}
+	printf(")\n");
     gsl_vector_free(x);
     gsl_vector_free(step_size);
     gsl_multimin_fminimizer_free(minimizer);
