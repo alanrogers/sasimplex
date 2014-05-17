@@ -942,10 +942,16 @@ sasimplex_onestep(void *vstate, gsl_multimin_function * func,
      * Han (Computational Optimization and Applications
      * 51(1):259-277, 2012).
      */
-    const double alpha = 1.0;
-    const double beta = 1.0 + 2.0 / n;
-    const double gmma = 0.75 - 1.0 / (2.0 * n);
-    const double delta = 1.0 - 1.0 / n;
+    double alpha = 1.0;
+    double beta = 2.0;
+	double gmma = 0.5;
+	double delta = 0.5;
+
+	if(n > 2) {
+		beta = 1.0 + 2.0 / n;
+		gmma = 0.75 - 1.0 / (2.0 * n);
+		delta = 1.0 - 1.0 / n;
+	}
 
     /*
      * Find highest, second highest and lowest point. We need the
