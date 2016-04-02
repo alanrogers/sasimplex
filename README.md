@@ -1,3 +1,5 @@
+# sasimplex
+
 sasimplex implements "Simplex Simulated Annealing", as described in
 Numerical Recipes, by Press et al. This implementation does not use
 code from Numerical Recipes. It is based on simplex2.c in version 1.16
@@ -12,10 +14,10 @@ using the function sasimplex_set_bounds.
 There are no references to external variables, so multiple copies of
 the minimizer can be started in different threads.
 
-DEPENDENCIES
+# DEPENDENCIES
 The Gnu Scientific Library.
 
-FILES
+# FILES
 sasimplex.c : source code for minimizer. 
 
 sasimplex.h : header file for minimizer
@@ -32,7 +34,7 @@ function with local minima at integers pairs such as (0,1) and
 constrained within the interval [1,10]. The constrained minimum is at
 [1,1].  
 
-COMPILING
+# COMPILING
 
 First install the Gnu Scientific Library. Then the example program can
 be compiled by typing "make xsasimplex" from the command. Without
